@@ -494,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnTriggerBackup.innerHTML = '<span class="pulse-dot"></span> Iniciando streaming...';
       showToast('Iniciando transmisión directa a Google Drive...', 'info');
 
-      const res = await fetch(`/api/backups/trigger/${dbId}`, { method: 'POST' });
+      const res = await authFetch(`/api/backups/trigger/${dbId}`, { method: 'POST' });
       const json = await res.json();
       if (json.success) {
         showToast(json.message, 'success');
