@@ -13,34 +13,6 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Optional Dashboard basic authentication if configured
-if (config.DASHBOARD_PASSWORD) {
-  app.use((req, res, next) => {
-    // Exclude healthcheck from auth so Dokploy and Docker monitoring works seamlessly
-    if (req.path === '/api/health') return next();
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="StreamVault Dashboard"');
-      return res.status(401).send('Authentication required.');
-    }
-
-    const auth = Buffer.from(authHeader.split(' ')[1] || '', 'base64').toString().split(':');
-    const user = auth[0];
-    const pass = auth[1];
-
-    const expectedUser = config.DASHBOARD_USERNAME || 'admin';
-    const expectedPass = config.DASHBOARD_PASSWORD;
-
-    if (user === expectedUser && pass === expectedPass) {
-      return next();
-    }
-
-    res.setHeader('WWW-Authenticate', 'Basic realm="StreamVault Dashboard"');
-    return res.status(401).send('Access denied.');
-  });
-}
-
 // Serve API routes
 app.use('/api', apiRoutes);
 

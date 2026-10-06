@@ -593,3 +593,158 @@ body {
   font-family: var(--font-mono);
   color: #38bdf8;
 }
+
+/* ==========================================================================
+   Stitch Cyber Lock Screen Styles (Access Key Authentication)
+   ========================================================================== */
+.lock-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99999;
+  background: radial-gradient(ellipse at 50% 20%, #162446 0%, #0b1326 70%, #060c18 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.lock-screen-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.lock-card {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(17, 26, 48, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(56, 189, 248, 0.12);
+  backdrop-filter: blur(16px);
+  text-align: center;
+  animation: lockCardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lockCardIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.lock-icon-glow {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  margin: 0 auto 1.5rem;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(56, 189, 248, 0.15));
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+}
+
+.lock-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.35rem;
+}
+
+.lock-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.75rem;
+  line-height: 1.4;
+}
+
+.lock-input-group {
+  position: relative;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+
+.lock-input {
+  width: 100%;
+  background-color: #060e20;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.85rem 3rem 0.85rem 1rem;
+  color: #fff;
+  font-size: 0.95rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+}
+
+.lock-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.lock-toggle-visibility {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-toggle-visibility:hover {
+  color: #fff;
+}
+
+.lock-error-alert {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  color: #fca5a5;
+  font-size: 0.825rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  animation: shake 0.3s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.lock-btn {
+  width: 100%;
+  padding: 0.85rem;
+  font-size: 0.95rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.lock-footer-badge {
+  margin-top: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.725rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+

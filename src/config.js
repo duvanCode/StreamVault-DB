@@ -15,9 +15,8 @@ module.exports = {
   BACKUP_CRON: process.env.BACKUP_CRON || '0 2 * * *', // Default daily at 2:00 AM
   TIMEZONE: process.env.TIMEZONE || 'UTC',
 
-  // Optional Dashboard basic authentication
-  DASHBOARD_USERNAME: process.env.DASHBOARD_USERNAME || '',
-  DASHBOARD_PASSWORD: process.env.DASHBOARD_PASSWORD || '',
+  // Access key authentication (Single secret key, no username required)
+  ACCESS_KEY: (process.env.ACCESS_KEY || process.env.DASHBOARD_KEY || process.env.DASHBOARD_PASSWORD || '').trim(),
 
   // Default credentials loaded from .env (can also be configured via Web UI)
   DEFAULT_DB: {

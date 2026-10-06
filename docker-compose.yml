@@ -15,7 +15,7 @@ services:
       - DATA_DIR=/app/data
       - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
       - TIMEZONE=${TIMEZONE:-UTC}
-      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
+      - ACCESS_KEY=${ACCESS_KEY:-${DASHBOARD_PASSWORD:-}}
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-}
       # Default DB settings (optional, can also be configured via Web UI)
       - DEFAULT_DB_TYPE=${DEFAULT_DB_TYPE:-postgres}

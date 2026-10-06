@@ -83,7 +83,7 @@ Para que el servicio pueda subir archivos automáticamente a tu Google Drive sin
    PORT=3000  # O el puerto que hayas configurado en el campo Port de Dokploy
    BACKUP_CRON=0 2 * * *
    TIMEZONE=America/Bogota
-   DASHBOARD_PASSWORD=clave_segura_de_acceso
+   ACCESS_KEY=clave_segura_de_acceso   # Llave única sin usuario
    GOOGLE_DRIVE_FOLDER_ID=1A2b3C4d5E...
    ```
 7. En la pestaña **Dominios (Domains)**, asigna tu subdominio (ej: `backups.tudominio.com`) con HTTPS automático generado por Dokploy/Traefik.

@@ -48,6 +48,148 @@ document.addEventListener('DOMContentLoaded', () => {
   const sectionOauth = document.getElementById('section-oauth');
   const btnTestGdrive = document.getElementById('btn-test-gdrive');
 
+  // Lock Screen Elements
+  const lockScreenOverlay = document.getElementById('lock-screen-overlay');
+  const formLockScreen = document.getElementById('form-lock-screen');
+  const inputAccessKey = document.getElementById('input-access-key');
+  const lockErrorAlert = document.getElementById('lock-error-alert');
+  const lockErrorText = document.getElementById('lock-error-text');
+  const btnToggleKeyVisibility = document.getElementById('btn-toggle-key-visibility');
+  const iconEyeShow = document.getElementById('icon-eye-show');
+  const iconEyeHide = document.getElementById('icon-eye-hide');
+  const btnLockSession = document.getElementById('btn-lock-session');
+  const btnUnlock = document.getElementById('btn-unlock');
+
+  // Token management
+  function getToken() {
+    return localStorage.getItem('streamvault_token') || '';
+  }
+
+  function setToken(token) {
+    if (token) localStorage.setItem('streamvault_token', token);
+    else localStorage.removeItem('streamvault_token');
+  }
+
+  function getAuthHeaders() {
+    const token = getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      headers['x-access-key'] = token;
+    }
+    return headers;
+  }
+
+  async function authFetch(url, options = {}) {
+    const headers = {
+      ...getAuthHeaders(),
+      ...(options.headers || {}),
+    };
+
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      // Show Lock Screen
+      showLockScreen();
+      throw new Error('Autenticación requerida.');
+    }
+    return res;
+  }
+
+  function showLockScreen() {
+    lockScreenOverlay.classList.remove('hidden');
+    inputAccessKey.value = '';
+    inputAccessKey.focus();
+    btnLockSession.style.display = 'inline-flex';
+  }
+
+  function hideLockScreen() {
+    lockScreenOverlay.classList.add('hidden');
+    lockErrorAlert.style.display = 'none';
+  }
+
+  // Toggle key visibility
+  btnToggleKeyVisibility.addEventListener('click', () => {
+    if (inputAccessKey.type === 'password') {
+      inputAccessKey.type = 'text';
+      iconEyeShow.style.display = 'none';
+      iconEyeHide.style.display = 'block';
+    } else {
+      inputAccessKey.type = 'password';
+      iconEyeShow.style.display = 'block';
+      iconEyeHide.style.display = 'none';
+    }
+  });
+
+  // Lock Screen submit
+  formLockScreen.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = inputAccessKey.value.trim();
+    if (!key) return;
+
+    try {
+      btnUnlock.disabled = true;
+      btnUnlock.textContent = 'Verificando...';
+      lockErrorAlert.style.display = 'none';
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setToken(json.token || key);
+        hideLockScreen();
+        btnLockSession.style.display = 'inline-flex';
+        showToast('Acceso autorizado.', 'success');
+        refreshAll();
+      } else {
+        lockErrorText.textContent = json.error || 'Llave de acceso incorrecta.';
+        lockErrorAlert.style.display = 'flex';
+        inputAccessKey.select();
+      }
+    } catch (err) {
+      lockErrorText.textContent = 'Error de conexión con el servidor.';
+      lockErrorAlert.style.display = 'flex';
+    } finally {
+      btnUnlock.disabled = false;
+      btnUnlock.textContent = 'Desbloquear Panel';
+    }
+  });
+
+  // Lock button in header
+  btnLockSession.addEventListener('click', () => {
+    setToken('');
+    showLockScreen();
+    showToast('Sesión bloqueada.', 'info');
+  });
+
+  // Check auth requirements on boot
+  async function checkAuthStatus() {
+    try {
+      const res = await fetch('/api/auth/status', {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+
+      if (data.requiresAuth) {
+        btnLockSession.style.display = 'inline-flex';
+        if (!data.authenticated) {
+          showLockScreen();
+          return false;
+        }
+      } else {
+        btnLockSession.style.display = 'none';
+        hideLockScreen();
+      }
+      return true;
+    } catch (err) {
+      console.error('Error checking auth:', err);
+      return false;
+    }
+  }
+
   // Helpers
   function formatBytes(bytes) {
     if (!bytes || bytes === 0) return '0 B';
@@ -113,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // API Calls
   async function fetchStatus() {
     try {
-      const res = await fetch('/api/status');
+      const res = await authFetch('/api/status');
       const data = await res.json();
       if (!data.success) return;
 
@@ -138,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchDatabases() {
     try {
-      const res = await fetch('/api/db-configs');
+      const res = await authFetch('/api/db-configs');
       const json = await res.json();
       if (!json.success) return;
 
@@ -201,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchBackups() {
     try {
-      const res = await fetch('/api/backups?limit=50');
+      const res = await authFetch('/api/backups?limit=50');
       const json = await res.json();
       if (!json.success) return;
 
@@ -257,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchRestoreTests() {
     try {
-      const res = await fetch('/api/restore-tests?limit=50');
+      const res = await authFetch('/api/restore-tests?limit=50');
       const json = await res.json();
       if (!json.success) return;
 
@@ -308,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchGDriveConfig() {
     try {
-      const res = await fetch('/api/gdrive-config');
+      const res = await authFetch('/api/gdrive-config');
       const json = await res.json();
       if (json.success && json.data) {
         const d = json.data;
@@ -325,6 +467,18 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.error('Error fetching Google Drive config:', err);
     }
+  }
+
+  async function refreshAll() {
+    try {
+      await Promise.all([
+        fetchStatus(),
+        fetchDatabases(),
+        fetchBackups(),
+        fetchRestoreTests(),
+        fetchGDriveConfig()
+      ]);
+    } catch (e) {}
   }
 
   // Trigger Manual Backup
@@ -367,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function triggerIntegrityTest(backupId) {
     try {
       showToast(`Iniciando prueba de integridad para backup #${backupId}...`, 'info');
-      const res = await fetch(`/api/restore-tests/trigger/${backupId}`, { method: 'POST' });
+      const res = await authFetch(`/api/restore-tests/trigger/${backupId}`, { method: 'POST' });
       const json = await res.json();
       if (json.success) {
         showToast('Auditoría iniciada. Revisa la pestaña Pruebas de Restauración.', 'success');
@@ -395,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function editDb(id) {
     try {
-      const res = await fetch('/api/db-configs');
+      const res = await authFetch('/api/db-configs');
       const json = await res.json();
       const db = json.data.find(d => d.id === Number(id));
       if (!db) return;
@@ -420,7 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function deleteDb(id) {
     if (!confirm('¿Estás seguro de que deseas eliminar esta configuración de base de datos?')) return;
     try {
-      const res = await fetch(`/api/db-configs/${id}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/db-configs/${id}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         showToast('Base de datos eliminada.', 'success');
@@ -451,9 +605,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const method = id ? 'PUT' : 'POST';
       const url = id ? `/api/db-configs/${id}` : '/api/db-configs';
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -490,9 +643,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       btnTestDbConn.disabled = true;
       btnTestDbConn.textContent = 'Probando conexión...';
-      const res = await fetch('/api/db-configs/test', {
+      const res = await authFetch('/api/db-configs/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -522,9 +674,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     try {
-      const res = await fetch('/api/gdrive-config', {
+      const res = await authFetch('/api/gdrive-config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -558,9 +709,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       btnTestGdrive.disabled = true;
       btnTestGdrive.textContent = 'Verificando Google Drive...';
-      const res = await fetch('/api/gdrive-config/test', {
+      const res = await authFetch('/api/gdrive-config/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -585,18 +735,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Refresh Button
   btnRefresh.addEventListener('click', async () => {
     showToast('Actualizando datos...', 'info');
-    await Promise.all([fetchStatus(), fetchDatabases(), fetchBackups(), fetchRestoreTests()]);
+    await refreshAll();
   });
 
-  // Initial Boot
-  fetchStatus();
-  fetchDatabases();
-  fetchBackups();
-  fetchRestoreTests();
-  fetchGDriveConfig();
+  // Initial Boot with Auth Verification
+  checkAuthStatus().then((authenticated) => {
+    if (authenticated) {
+      refreshAll();
+    }
+  });
 
-  // Background Auto-Refresh every 6 seconds
+  // Background Auto-Refresh every 6 seconds if authenticated
   setInterval(() => {
+    if (!lockScreenOverlay.classList.contains('hidden')) return;
     fetchStatus();
     fetchBackups();
     fetchRestoreTests();

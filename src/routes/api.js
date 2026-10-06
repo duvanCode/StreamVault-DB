@@ -16,6 +16,70 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Authentication Status Endpoint (No auth required)
+router.get('/auth/status', (req, res) => {
+  const requiresAuth = Boolean(config.ACCESS_KEY);
+  if (!requiresAuth) {
+    return res.json({ requiresAuth: false, authenticated: true });
+  }
+
+  const provided = req.headers['x-access-key'] || (req.headers.authorization && req.headers.authorization.replace(/^Bearer\s+/i, '').trim());
+  const token = Buffer.from(config.ACCESS_KEY).toString('base64');
+  const authenticated = provided === config.ACCESS_KEY || provided === token;
+
+  res.json({ requiresAuth: true, authenticated });
+});
+
+// Authentication Login Endpoint (Verify Access Key)
+router.post('/auth/login', (req, res) => {
+  if (!config.ACCESS_KEY) {
+    return res.json({ success: true, message: 'Autenticación no requerida.' });
+  }
+
+  const { key } = req.body || {};
+  const cleanKey = (key || '').trim();
+
+  if (cleanKey === config.ACCESS_KEY) {
+    const token = Buffer.from(config.ACCESS_KEY).toString('base64');
+    return res.json({
+      success: true,
+      token,
+      message: 'Acceso autorizado.',
+    });
+  }
+
+  return res.status(401).json({
+    success: false,
+    error: 'Llave de acceso incorrecta.',
+  });
+});
+
+// Access Key Protection Middleware for all other API endpoints
+router.use((req, res, next) => {
+  // If no ACCESS_KEY is configured in .env, permit all access
+  if (!config.ACCESS_KEY) {
+    return next();
+  }
+
+  const headerKey = req.headers['x-access-key'];
+  const authHeader = req.headers.authorization;
+  let provided = headerKey;
+  if (!provided && authHeader) {
+    provided = authHeader.replace(/^Bearer\s+/i, '').trim();
+  }
+
+  const token = Buffer.from(config.ACCESS_KEY).toString('base64');
+  if (provided === config.ACCESS_KEY || provided === token) {
+    return next();
+  }
+
+  return res.status(401).json({
+    success: false,
+    requiresAuth: true,
+    error: 'Acceso no autorizado. Se requiere llave de acceso válida.',
+  });
+});
+
 // Overall Dashboard Summary & Statistics
 router.get('/status', (req, res) => {
   try {
