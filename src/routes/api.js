@@ -54,10 +54,156 @@ router.post('/auth/login', (req, res) => {
   });
 });
 
+// Google OAuth 2.0 Public Redirect Callback
+router.get('/gdrive/oauth/callback', async (req, res) => {
+  const { code, error, state } = req.query;
+
+  if (error) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error de Autenticación - StreamVault DB</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b1326; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+          .card { background: #111e38; border: 1px solid #ef4444; border-radius: 12px; padding: 2.5rem; max-width: 460px; text-align: center; }
+          h2 { color: #ef4444; margin-top: 0; }
+          p { color: #94a3b8; line-height: 1.5; }
+          .btn { margin-top: 1.5rem; background: #ef4444; color: #fff; padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div style="font-size: 3rem; margin-bottom: 1rem;">❌</div>
+          <h2>Autorización Cancelada</h2>
+          <p>Google reportó un error: <strong>${error}</strong></p>
+          <button class="btn" onclick="window.close()">Cerrar Ventana</button>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  if (!code) {
+    return res.status(400).send('No se recibió código de autorización de Google.');
+  }
+
+  try {
+    const active = storage.getGDriveConfig() || {};
+    let redirectUri = '';
+    if (state) {
+      try {
+        const decoded = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'));
+        if (decoded.redirectUri) redirectUri = decoded.redirectUri;
+      } catch (e) {}
+    }
+
+    if (!redirectUri) {
+      const proto = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['x-forwarded-host'] || req.get('host');
+      redirectUri = `${proto}://${host}/api/gdrive/oauth/callback`;
+    }
+
+    if (!active.client_id || !active.client_secret) {
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Faltan Credenciales - StreamVault DB</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b1326; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .card { background: #111e38; border: 1px solid #f59e0b; border-radius: 12px; padding: 2.5rem; max-width: 460px; text-align: center; }
+            h2 { color: #f59e0b; margin-top: 0; }
+            p { color: #94a3b8; line-height: 1.5; }
+            .btn { margin-top: 1.5rem; background: #38bdf8; color: #0b1326; padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <h2>Falta Client ID o Client Secret</h2>
+            <p>Por favor ingresa primero el Client ID y Client Secret en el panel de StreamVault antes de conectar.</p>
+            <button class="btn" onclick="window.close()">Cerrar Ventana</button>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    const tokens = await GoogleDriveService.exchangeCodeForTokens({
+      clientId: active.client_id,
+      clientSecret: active.client_secret,
+      redirectUri,
+      code,
+    });
+
+    if (tokens.refresh_token) {
+      storage.saveGDriveConfig({
+        ...active,
+        auth_type: 'oauth',
+        refresh_token: tokens.refresh_token,
+      });
+    }
+
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Google Drive Conectado - StreamVault DB</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b1326; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+          .card { background: #111e38; border: 1px solid #10b981; border-radius: 12px; padding: 2.5rem; max-width: 480px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+          h2 { color: #10b981; margin-top: 0; margin-bottom: 0.5rem; }
+          p { color: #94a3b8; line-height: 1.5; font-size: 0.95rem; }
+          .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: bold; margin-bottom: 1rem; }
+          .btn { display: inline-block; margin-top: 1.5rem; background: #38bdf8; color: #0b1326; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">⚡</div>
+          <span class="badge">OAuth 2.0 Conectado</span>
+          <h2>¡Google Drive Vinculado!</h2>
+          <p>Tu cuenta personal ha sido autorizada correctamente. El token de actualización (Refresh Token) se configuró de forma segura.</p>
+          <p style="font-size: 0.85rem; color: #64748b;">Esta ventana se cerrará automáticamente...</p>
+          <button class="btn" onclick="window.close()">Cerrar Ventana</button>
+        </div>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({ type: 'GDRIVE_OAUTH_SUCCESS', refreshToken: '${tokens.refresh_token || ""}' }, '*');
+            setTimeout(() => window.close(), 1600);
+          }
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    return res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <body style="background:#0b1326; color:#ef4444; font-family:sans-serif; padding:2rem; text-align:center;">
+        <h2>Error al intercambiar autorización con Google</h2>
+        <pre style="background:#111e38; padding:1rem; border-radius:8px; color:#f8fafc; text-align:left; max-width:600px; margin: 0 auto;">${err.message}</pre>
+        <br>
+        <button onclick="window.close()" style="background:#38bdf8; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Cerrar Ventana</button>
+      </body>
+      </html>
+    `);
+  }
+});
+
 // Access Key Protection Middleware for all other API endpoints
 router.use((req, res, next) => {
   // If no ACCESS_KEY is configured in .env, permit all access
   if (!config.ACCESS_KEY) {
+    return next();
+  }
+
+  // Exempt public callback
+  if (req.path === '/gdrive/oauth/callback') {
     return next();
   }
 
@@ -226,7 +372,9 @@ router.get('/gdrive-config', (req, res) => {
         last_tested_at: gdrive.last_tested_at,
         has_service_account: Boolean(gdrive.service_account_json),
         has_oauth: Boolean(gdrive.refresh_token),
-        client_id: gdrive.client_id ? 'Configured' : '',
+        client_id: gdrive.client_id || '',
+        has_client_secret: Boolean(gdrive.client_secret),
+        has_refresh_token: Boolean(gdrive.refresh_token),
       },
     });
   } catch (err) {
@@ -237,20 +385,78 @@ router.get('/gdrive-config', (req, res) => {
 router.post('/gdrive-config', async (req, res) => {
   try {
     const { auth_type, service_account_json, client_id, client_secret, refresh_token, folder_id } = req.body;
-    if (!folder_id) {
-      return res.status(400).json({ success: false, error: 'Google Drive Folder ID is required.' });
-    }
 
     const id = storage.saveGDriveConfig({
-      auth_type: auth_type || 'service_account',
-      service_account_json: service_account_json || '',
-      client_id: client_id || '',
-      client_secret: client_secret || '',
-      refresh_token: refresh_token || '',
-      folder_id,
+      auth_type: auth_type || 'oauth',
+      service_account_json: service_account_json !== undefined ? service_account_json : undefined,
+      client_id: client_id !== undefined ? client_id : undefined,
+      client_secret: client_secret !== undefined ? client_secret : undefined,
+      refresh_token: refresh_token !== undefined ? refresh_token : undefined,
+      folder_id: folder_id || 'root',
     });
 
-    res.json({ success: true, id, message: 'Google Drive configuration saved.' });
+    res.json({ success: true, id, message: 'Configuración de Google Drive guardada.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Generate Google OAuth 2.0 Auth URL
+router.post('/gdrive/oauth/url', (req, res) => {
+  try {
+    const { client_id, client_secret, redirect_uri, folder_id } = req.body;
+    if (!client_id) {
+      return res.status(400).json({ success: false, error: 'Client ID es requerido para conectar con Google.' });
+    }
+
+    const current = storage.getGDriveConfig() || {};
+    // Pre-save client_id, client_secret and folder_id before redirecting
+    storage.saveGDriveConfig({
+      auth_type: 'oauth',
+      client_id,
+      client_secret: client_secret || current.client_secret || '',
+      folder_id: folder_id || current.folder_id || 'root',
+    });
+
+    const state = Buffer.from(JSON.stringify({ redirectUri: redirect_uri })).toString('base64url');
+    const authUrl = GoogleDriveService.generateAuthUrl({
+      clientId: client_id,
+      clientSecret: client_secret || current.client_secret || '',
+      redirectUri,
+      state,
+    });
+
+    res.json({ success: true, url: authUrl });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Manual exchange code for tokens
+router.post('/gdrive/oauth/exchange', async (req, res) => {
+  try {
+    const { client_id, client_secret, redirect_uri, code } = req.body;
+    if (!client_id || !client_secret || !code) {
+      return res.status(400).json({ success: false, error: 'Client ID, Client Secret y Código de autorización son requeridos.' });
+    }
+
+    const tokens = await GoogleDriveService.exchangeCodeForTokens({
+      clientId,
+      clientSecret,
+      redirectUri,
+      code,
+    });
+
+    if (tokens.refresh_token) {
+      storage.saveGDriveConfig({
+        auth_type: 'oauth',
+        client_id,
+        client_secret,
+        refresh_token: tokens.refresh_token,
+      });
+    }
+
+    res.json({ success: true, tokens, message: 'Tokens obtenidos y guardados exitosamente.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -56,6 +56,57 @@ class GoogleDriveService {
   }
 
   /**
+   * Generates Google OAuth 2.0 authorization URL
+   * @param {Object} params
+   * @param {string} params.clientId
+   * @param {string} params.clientSecret
+   * @param {string} params.redirectUri
+   * @param {string} [params.state]
+   */
+  static generateAuthUrl({ clientId, clientSecret, redirectUri, state = '' }) {
+    if (!clientId) {
+      throw new Error('Client ID is required to generate Google OAuth URL.');
+    }
+    const oauth2Client = new google.auth.OAuth2(
+      clientId,
+      clientSecret || '',
+      redirectUri
+    );
+
+    return oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: [
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive',
+      ],
+      state,
+    });
+  }
+
+  /**
+   * Exchanges authorization code for OAuth tokens
+   * @param {Object} params
+   * @param {string} params.clientId
+   * @param {string} params.clientSecret
+   * @param {string} params.redirectUri
+   * @param {string} params.code
+   */
+  static async exchangeCodeForTokens({ clientId, clientSecret, redirectUri, code }) {
+    if (!clientId || !clientSecret || !code) {
+      throw new Error('clientId, clientSecret, and code are required to exchange OAuth tokens.');
+    }
+    const oauth2Client = new google.auth.OAuth2(
+      clientId,
+      clientSecret,
+      redirectUri
+    );
+
+    const { tokens } = await oauth2Client.getToken(code);
+    return tokens;
+  }
+
+  /**
    * Tests the Google Drive connection and folder access
    */
   static async testConnection(customConfig = null) {
@@ -66,6 +117,7 @@ class GoogleDriveService {
       folderName: null,
       account: null,
       storageQuota: null,
+      isSharedDrive: false,
       message: '',
     };
 
@@ -81,30 +133,67 @@ class GoogleDriveService {
       if (config.folder_id && config.folder_id !== 'root') {
         const folderRes = await drive.files.get({
           fileId: config.folder_id,
-          fields: 'id, name, mimeType, capabilities, trashed',
+          fields: 'id, name, mimeType, capabilities, trashed, driveId',
           supportsAllDrives: true,
         });
 
         if (folderRes.data.trashed) {
-          throw new Error(`The target folder ID "${config.folder_id}" is currently in the trash.`);
+          throw new Error(`La carpeta especificada "${config.folder_id}" se encuentra en la papelera.`);
         }
         result.folderName = folderRes.data.name;
+        result.isSharedDrive = Boolean(folderRes.data.driveId);
 
         // Check write permission
         if (folderRes.data.capabilities && !folderRes.data.capabilities.canAddChildren) {
-          throw new Error(`The account (${result.account}) does not have permission to upload files to folder "${folderRes.data.name}". Please grant "Editor" or "Contributor" permissions.`);
+          throw new Error(`La cuenta (${result.account}) no tiene permisos para agregar archivos a la carpeta "${folderRes.data.name}". Por favor concede permisos de "Editor" o "Gestor de contenido".`);
+        }
+
+        // 3. Proactive quota probe: Service Accounts have 0 quota on personal drives!
+        if (config.auth_type === 'service_account' && !folderRes.data.driveId) {
+          try {
+            const probe = await drive.files.create({
+              requestBody: {
+                name: `.streamvault_probe_${Date.now()}.tmp`,
+                parents: [config.folder_id],
+              },
+              media: {
+                mimeType: 'text/plain',
+                body: 'StreamVault connection probe',
+              },
+              fields: 'id',
+              supportsAllDrives: true,
+            });
+            if (probe.data && probe.data.id) {
+              await drive.files.delete({
+                fileId: probe.data.id,
+                supportsAllDrives: true,
+              }).catch(() => {});
+            }
+          } catch (probeErr) {
+            if (probeErr.message && probeErr.message.includes('Service Accounts do not have storage quota')) {
+              throw new Error(
+                'Las Cuentas de Servicio (Service Account) tienen 0 bytes de cuota y Google no permite subir archivos a carpetas personales de @gmail.com. ' +
+                'Solución: Si usas una cuenta de Gmail personal, cambia el método a "OAuth 2.0" y conecta tu cuenta. Si usas Google Workspace, mueve la carpeta a una "Unidad Compartida" (Shared Drive).'
+              );
+            }
+            throw probeErr;
+          }
         }
       } else {
         result.folderName = 'Root Drive';
       }
 
       result.ok = true;
-      result.message = `Successfully connected to Google Drive (${result.account}) with target folder "${result.folderName}".`;
+      result.message = `Conectado exitosamente a Google Drive (${result.account}) en la carpeta "${result.folderName}".`;
       return result;
     } catch (err) {
       result.ok = false;
-      result.message = err.message || 'Failed to connect to Google Drive.';
-      throw new Error(result.message);
+      let msg = err.message || 'Error al conectar con Google Drive.';
+      if (msg.includes('Service Accounts do not have storage quota')) {
+        msg = 'Las Cuentas de Servicio tienen 0 bytes de cuota en carpetas personales (@gmail.com). Para cuentas personales, utiliza OAuth 2.0. Para cuentas corporativas, usa una Unidad Compartida (Shared Drive).';
+      }
+      result.message = msg;
+      throw new Error(msg);
     }
   }
 
@@ -129,24 +218,36 @@ class GoogleDriveService {
       requestBody.parents = [targetFolder];
     }
 
-    const res = await drive.files.create(
-      {
-        requestBody,
-        media: {
-          mimeType,
-          body: stream,
+    try {
+      const res = await drive.files.create(
+        {
+          requestBody,
+          media: {
+            mimeType,
+            body: stream,
+          },
+          fields: 'id, name, size, webViewLink, webContentLink, createdTime, md5Checksum',
+          supportsAllDrives: true,
         },
-        fields: 'id, name, size, webViewLink, webContentLink, createdTime, md5Checksum',
-        supportsAllDrives: true,
-      },
-      {
-        // Infinite timeout & body size for large database dumps
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-      }
-    );
+        {
+          // Infinite timeout & body size for large database dumps
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        }
+      );
 
-    return res.data;
+      return res.data;
+    } catch (err) {
+      if (err.message && err.message.includes('Service Accounts do not have storage quota')) {
+        throw new Error(
+          'Google Drive rechazó la subida: Las cuentas de servicio (Service Accounts) tienen 0 bytes de cuota y NO pueden subir archivos a carpetas personales de @gmail.com.\n\n' +
+          'SOLUCIÓN:\n' +
+          '1. Si usas cuenta personal @gmail.com: Cambia el método de autenticación a "OAuth 2.0" en la pestaña Google Drive y conecta tu cuenta.\n' +
+          '2. Si usas Google Workspace: Mueve la carpeta a una "Unidad Compartida" (Shared Drive) y agrega el correo de la cuenta de servicio como "Gestor de contenido".'
+        );
+      }
+      throw err;
+    }
   }
 
   /**

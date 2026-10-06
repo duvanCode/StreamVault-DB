@@ -249,6 +249,18 @@ const storage = {
   },
 
   saveGDriveConfig: (item) => {
+    const current = (db
+      ? db.prepare("SELECT * FROM gdrive_configs WHERE is_active = 1 ORDER BY id DESC LIMIT 1").get()
+      : (jsonStore.gdrive_configs.find(g => g.is_active) || jsonStore.gdrive_configs[0])) || {};
+
+    const auth_type = item.auth_type || current.auth_type || 'service_account';
+    const service_account_json = item.service_account_json !== undefined ? item.service_account_json : (current.service_account_json || '');
+    const client_id = item.client_id !== undefined ? item.client_id : (current.client_id || '');
+    const client_secret = (item.client_secret && item.client_secret !== '********') ? item.client_secret : (current.client_secret || '');
+    const refresh_token = (item.refresh_token && item.refresh_token !== '********') ? item.refresh_token : (current.refresh_token || '');
+    const folder_id = item.folder_id !== undefined ? item.folder_id : (current.folder_id || '');
+    const folder_name = item.folder_name !== undefined ? item.folder_name : (current.folder_name || '');
+
     if (db) {
       // Deactivate older active configs
       db.prepare("UPDATE gdrive_configs SET is_active = 0").run();
@@ -256,19 +268,30 @@ const storage = {
         INSERT INTO gdrive_configs (auth_type, service_account_json, client_id, client_secret, refresh_token, folder_id, folder_name, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?, 1)
       `).run(
-        item.auth_type,
-        item.service_account_json || '',
-        item.client_id || '',
-        item.client_secret || '',
-        item.refresh_token || '',
-        item.folder_id,
-        item.folder_name || ''
+        auth_type,
+        service_account_json,
+        client_id,
+        client_secret,
+        refresh_token,
+        folder_id,
+        folder_name
       );
       return result.lastInsertRowid;
     }
     jsonStore.gdrive_configs.forEach(g => g.is_active = 0);
     const newId = jsonStore.gdrive_configs.length + 1;
-    const rec = { ...item, id: newId, is_active: 1, created_at: new Date().toISOString() };
+    const rec = {
+      auth_type,
+      service_account_json,
+      client_id,
+      client_secret,
+      refresh_token,
+      folder_id,
+      folder_name,
+      id: newId,
+      is_active: 1,
+      created_at: new Date().toISOString()
+    };
     jsonStore.gdrive_configs.push(rec);
     saveJsonStore();
     return newId;

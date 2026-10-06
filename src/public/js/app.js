@@ -47,6 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const sectionSaJson = document.getElementById('section-sa-json');
   const sectionOauth = document.getElementById('section-oauth');
   const btnTestGdrive = document.getElementById('btn-test-gdrive');
+  const oauthRedirectUri = document.getElementById('oauth-redirect-uri');
+  const btnCopyRedirectUri = document.getElementById('btn-copy-redirect-uri');
+  const btnOauthConnect = document.getElementById('btn-oauth-connect');
+  const oauthTokenStatus = document.getElementById('oauth-token-status');
 
   // Lock Screen Elements
   const lockScreenOverlay = document.getElementById('lock-screen-overlay');
@@ -252,6 +256,97 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Setup OAuth redirect URI input
+  if (oauthRedirectUri) {
+    oauthRedirectUri.value = `${window.location.origin}/api/gdrive/oauth/callback`;
+  }
+
+  // Copy OAuth redirect URI
+  if (btnCopyRedirectUri) {
+    btnCopyRedirectUri.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(oauthRedirectUri.value);
+        showToast('URI copiada al portapapeles. Pégala en Google Cloud Console.', 'success');
+      } catch (err) {
+        oauthRedirectUri.select();
+        document.execCommand('copy');
+        showToast('URI copiada al portapapeles.', 'success');
+      }
+    });
+  }
+
+  // 1-Click OAuth Connect with Google
+  if (btnOauthConnect) {
+    btnOauthConnect.addEventListener('click', async () => {
+      const clientId = gdriveClientId.value.trim();
+      const clientSecret = gdriveClientSecret.value.trim();
+      const folderId = gdriveFolderId.value.trim() || 'root';
+      const redirectUri = oauthRedirectUri.value;
+
+      if (!clientId) {
+        showToast('Por favor introduce tu Client ID antes de conectar.', 'error');
+        gdriveClientId.focus();
+        return;
+      }
+
+      try {
+        btnOauthConnect.disabled = true;
+        btnOauthConnect.textContent = 'Iniciando autorización...';
+
+        const res = await authFetch('/api/gdrive/oauth/url', {
+          method: 'POST',
+          body: JSON.stringify({
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+            folder_id: folderId,
+          }),
+        });
+        const json = await res.json();
+        if (json.success && json.url) {
+          const width = 600, height = 700;
+          const left = window.screen.width / 2 - width / 2;
+          const top = window.screen.height / 2 - height / 2;
+          window.open(
+            json.url,
+            'google_oauth_popup',
+            `width=${width},height=${height},top=${top},left=${left},status=no,resizable=yes`
+          );
+          showToast('Ventana de Google abierta. Selecciona tu cuenta y concede permisos.', 'info');
+        } else {
+          showToast('Error al preparar OAuth: ' + (json.error || 'Desconocido'), 'error');
+        }
+      } catch (err) {
+        showToast('Error de conexión: ' + err.message, 'error');
+      } finally {
+        btnOauthConnect.disabled = false;
+        btnOauthConnect.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+          </svg>
+          Conectar con Google (1 Clic)
+        `;
+      }
+    });
+  }
+
+  // Listen for popup callback message
+  window.addEventListener('message', async (event) => {
+    if (event.data && event.data.type === 'GDRIVE_OAUTH_SUCCESS') {
+      if (oauthTokenStatus) {
+        oauthTokenStatus.className = 'badge badge-success';
+        oauthTokenStatus.textContent = 'Token Vinculado';
+      }
+      gdriveRefreshToken.placeholder = '•••••••••••••••• (Token Activo)';
+      showToast('🎉 ¡Google Drive conectado exitosamente con tu cuenta personal!', 'success');
+      await fetchGDriveConfig();
+      await fetchStatus();
+    }
+  });
+
   // API Calls
   async function fetchStatus() {
     try {
@@ -454,8 +549,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const json = await res.json();
       if (json.success && json.data) {
         const d = json.data;
-        gdriveAuthType.value = d.auth_type;
-        gdriveFolderId.value = d.folder_id;
+        gdriveAuthType.value = d.auth_type || 'oauth';
+        gdriveFolderId.value = d.folder_id || '';
+        if (d.client_id) gdriveClientId.value = d.client_id;
+        if (d.has_client_secret) gdriveClientSecret.placeholder = '•••••••••••••••• (Configurado)';
+        if (d.has_oauth) {
+          if (oauthTokenStatus) {
+            oauthTokenStatus.className = 'badge badge-success';
+            oauthTokenStatus.textContent = 'Token Vinculado';
+          }
+          gdriveRefreshToken.placeholder = '•••••••••••••••• (Token Activo)';
+        } else {
+          if (oauthTokenStatus) {
+            oauthTokenStatus.className = 'badge badge-secondary';
+            oauthTokenStatus.textContent = 'Sin Token';
+          }
+        }
+
         if (d.auth_type === 'service_account') {
           sectionSaJson.style.display = 'block';
           sectionOauth.style.display = 'none';
@@ -666,11 +776,11 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const payload = {
       auth_type: gdriveAuthType.value,
-      folder_id: gdriveFolderId.value,
-      service_account_json: gdriveSaJson.value,
-      client_id: gdriveClientId.value,
-      client_secret: gdriveClientSecret.value,
-      refresh_token: gdriveRefreshToken.value,
+      folder_id: gdriveFolderId.value.trim() || 'root',
+      service_account_json: gdriveSaJson.value.trim(),
+      client_id: gdriveClientId.value.trim(),
+      client_secret: gdriveClientSecret.value.trim(),
+      refresh_token: gdriveRefreshToken.value.trim(),
     };
 
     try {
@@ -680,7 +790,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const json = await res.json();
       if (json.success) {
-        showToast('Credenciales de Google Drive guardadas.', 'success');
+        showToast('Credenciales de Google Drive guardadas exitosamente.', 'success');
+        await fetchGDriveConfig();
         await fetchStatus();
       } else {
         showToast('Error: ' + json.error, 'error');
@@ -694,17 +805,12 @@ document.addEventListener('DOMContentLoaded', () => {
   btnTestGdrive.addEventListener('click', async () => {
     const payload = {
       auth_type: gdriveAuthType.value,
-      folder_id: gdriveFolderId.value,
-      service_account_json: gdriveSaJson.value,
-      client_id: gdriveClientId.value,
-      client_secret: gdriveClientSecret.value,
-      refresh_token: gdriveRefreshToken.value,
+      folder_id: gdriveFolderId.value.trim() || 'root',
+      service_account_json: gdriveSaJson.value.trim(),
+      client_id: gdriveClientId.value.trim(),
+      client_secret: gdriveClientSecret.value.trim(),
+      refresh_token: gdriveRefreshToken.value.trim(),
     };
-
-    if (!payload.folder_id) {
-      showToast('Por favor introduce el ID de la carpeta de Drive.', 'error');
-      return;
-    }
 
     try {
       btnTestGdrive.disabled = true;
@@ -718,7 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast(`✅ Conectado a Drive: ${json.result.folderName} (${json.result.account})`, 'success');
         await fetchStatus();
       } else {
-        showToast('❌ Error de Drive: ' + json.error, 'error');
+        showToast('❌ ' + json.error, 'error');
       }
     } catch (err) {
       showToast('Error al verificar: ' + err.message, 'error');

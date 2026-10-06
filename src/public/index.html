@@ -281,45 +281,104 @@
           </button>
         </div>
 
+        <!-- Info Banner sobre Cuota de Google Drive -->
+        <div style="background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
+          <h4 style="color: var(--accent); margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            ¿Qué método de autenticación debes elegir?
+          </h4>
+          <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 0.85rem; border-radius: 6px; border-left: 3px solid #10b981;">
+              <strong style="color: #10b981; display: block; margin-bottom: 0.25rem;">Opción 1: OAuth 2.0 (Cuentas @gmail.com)</strong>
+              <p style="margin: 0;">
+                Si usas una cuenta de Gmail personal, <strong>este es el método requerido</strong>. Las copias se suben directamente a tu almacenamiento personal (15 GB gratuitos o Google One). Solo requiere Client ID y Secret.
+              </p>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 0.85rem; border-radius: 6px; border-left: 3px solid #38bdf8;">
+              <strong style="color: #38bdf8; display: block; margin-bottom: 0.25rem;">Opción 2: Cuenta de Servicio (Google Workspace)</strong>
+              <p style="margin: 0;">
+                Google asigna <strong>0 GB</strong> de cuota a las Cuentas de Servicio. Para usarlas sin error de cuota, la carpeta debe estar dentro de una <strong>Unidad Compartida (Shared Drive)</strong> de Workspace.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <form id="form-gdrive">
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label">Método de Autenticación</label>
               <select id="gdrive-auth-type" class="form-select">
-                <option value="service_account">Cuenta de Servicio (Service Account JSON - Recomendado)</option>
-                <option value="oauth">OAuth 2.0 (Refresh Token)</option>
+                <option value="oauth">OAuth 2.0 (Recomendado para cuentas @gmail.com personales)</option>
+                <option value="service_account">Cuenta de Servicio JSON (Solo para Unidades Compartidas / Workspace)</option>
               </select>
             </div>
 
             <div class="form-group">
               <label class="form-label">ID de Carpeta en Google Drive</label>
-              <input type="text" id="gdrive-folder-id" class="form-input" placeholder="Ej: 1A2b3C4d5E6f7G8h9I0jK..." required>
-              <span class="stat-subtext">El ID que aparece al final de la URL en drive.google.com/drive/folders/<strong>ID</strong></span>
-            </div>
-
-            <!-- Service Account section -->
-            <div class="form-group full-width" id="section-sa-json">
-              <label class="form-label">Service Account JSON (Contenido de la llave .json)</label>
-              <textarea id="gdrive-sa-json" class="form-textarea" placeholder='{"type": "service_account", "project_id": "...", "private_key": "...", "client_email": "..."}'></textarea>
-              <span class="stat-subtext">💡 Recuerda compartir la carpeta de Google Drive con el correo <code>client_email</code> de la cuenta de servicio con permisos de Editor.</span>
+              <input type="text" id="gdrive-folder-id" class="form-input" placeholder="Ej: 1A2b3C4d5E6f7G8h9I0jK... (o escribe 'root')">
+              <span class="stat-subtext">El ID que aparece al final de la URL en drive.google.com/drive/folders/<strong>ID</strong> (o 'root' para la raíz)</span>
             </div>
 
             <!-- OAuth section -->
-            <div class="form-group full-width" id="section-oauth" style="display: none;">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">Client ID</label>
-                  <input type="text" id="gdrive-client-id" class="form-input">
+            <div class="form-group full-width" id="section-oauth">
+              <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+                  <div>
+                    <h4 style="color: var(--text-primary); margin: 0; font-size: 0.95rem;">Conectar con Google OAuth 2.0</h4>
+                    <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.25rem 0 0 0;">
+                      Ingresa tu Client ID y Secret de Google Cloud y haz clic en Conectar para autorizar en 1 clic.
+                    </p>
+                  </div>
+                  <button type="button" class="btn btn-primary" id="btn-oauth-connect" style="background: #2563eb; border-color: #3b82f6;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                    </svg>
+                    Conectar con Google (1 Clic)
+                  </button>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Client Secret</label>
-                  <input type="password" id="gdrive-client-secret" class="form-input">
-                </div>
-                <div class="form-group full-width">
-                  <label class="form-label">Refresh Token</label>
-                  <input type="password" id="gdrive-refresh-token" class="form-input">
+
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label class="form-label">Client ID</label>
+                    <input type="text" id="gdrive-client-id" class="form-input" placeholder="ej: 123456789-xxx.apps.googleusercontent.com">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Client Secret</label>
+                    <input type="password" id="gdrive-client-secret" class="form-input" placeholder="ej: GOCSPX-xxxxxxxxxxxxxx">
+                  </div>
+                  <div class="form-group full-width">
+                    <label class="form-label">URI de Redirección Autorizada para Google Cloud Console</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                      <input type="text" id="oauth-redirect-uri" class="form-input" readonly style="background: rgba(15, 23, 42, 0.9); font-family: monospace; font-size: 0.8rem; color: var(--accent);">
+                      <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-redirect-uri" style="white-space: nowrap;">
+                        Copiar URI
+                      </button>
+                    </div>
+                    <span class="stat-subtext">Copia y pega esta URL en Google Cloud Console > APIs y servicios > Credenciales > Tu ID de cliente OAuth > <strong>URIs de redireccionamiento autorizados</strong>.</span>
+                  </div>
+                  <div class="form-group full-width">
+                    <label class="form-label">Refresh Token</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                      <input type="password" id="gdrive-refresh-token" class="form-input" placeholder="Se completará automáticamente al Conectar con Google (o pega uno manualmente)">
+                      <span id="oauth-token-status" class="badge badge-secondary" style="white-space: nowrap; padding: 0.45rem 0.75rem;">Sin Token</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <!-- Service Account section -->
+            <div class="form-group full-width" id="section-sa-json" style="display: none;">
+              <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 0.85rem 1rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: #fca5a5;">
+                ⚠️ <strong>Aviso importante:</strong> Para usar Cuenta de Servicio, la carpeta <strong>DEBE pertenecer a una "Unidad Compartida" (Shared Drive) de Google Workspace</strong> y debes invitar a tu <code>client_email</code> como <strong>Gestor de contenido</strong>. En cuentas personales @gmail.com Google bloquea la subida con error de cuota cero.
+              </div>
+              <label class="form-label">Service Account JSON (Contenido de la llave .json)</label>
+              <textarea id="gdrive-sa-json" class="form-textarea" placeholder='{"type": "service_account", "project_id": "...", "private_key": "...", "client_email": "..."}'></textarea>
             </div>
           </div>
 

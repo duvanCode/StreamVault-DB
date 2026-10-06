@@ -177,6 +177,11 @@ class DatabaseStreamer {
         stream: monitorStream,
         mimeType: 'application/gzip',
         folderId: options.folderId || null,
+      }).catch((uploadErr) => {
+        try {
+          if (!dumpProcess.killed) dumpProcess.kill('SIGTERM');
+        } catch (e) {}
+        throw uploadErr;
       });
 
       // Wait for process exit and upload completion concurrently
