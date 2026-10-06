@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreamVault DB - Backup Streamer & Restore to Google Drive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3V7M4 7c0-2 1.5-3 3.5-3h9c2 0 3.5 1 3.5 3M4 7h16m-8 4v6m-3-3l3 3 3-3"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">StreamVault DB</div>
+        <div class="brand-tagline">Zero-Disk Direct Streaming to Google Drive • VPS & Dokploy Ready</div>
+      </div>
+    </div>
+
+    <div class="header-badges">
+      <div class="badge badge-stream" id="badge-stream-mode">
+        <span class="pulse-dot"></span> Zero-Disk Streaming
+      </div>
+      <div class="badge badge-success" id="badge-drive-status">
+        <span class="pulse-dot"></span> Google Drive Conectado
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btn-refresh" title="Actualizar datos">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Top Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Copias de Seguridad</span>
+          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
+          </svg>
+        </div>
+        <div class="stat-value" id="stat-total-backups">0</div>
+        <div class="stat-subtext" id="stat-success-rate">Tasa de éxito: 100%</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Transferido a Google Drive</span>
+          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+        </div>
+        <div class="stat-value" id="stat-total-bytes">0 MB</div>
+        <div class="stat-subtext">Direct Stream (0 MB ocupados en VPS)</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Próxima Ejecución (Cron)</span>
+          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <div class="stat-value" id="stat-cron-schedule" style="font-size: 1.35rem;">0 2 * * *</div>
+        <div class="stat-subtext" id="stat-next-run">Automático diario a las 02:00 AM</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Verificación de Integridad</span>
+          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <div class="stat-value" id="stat-test-pass-rate">100%</div>
+        <div class="stat-subtext" id="stat-test-count">0 pruebas ejecutadas</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-tab="tab-backups">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+        </svg>
+        Historial de Copias
+      </button>
+      <button class="tab-btn" data-tab="tab-databases">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+        </svg>
+        Bases de Datos
+      </button>
+      <button class="tab-btn" data-tab="tab-gdrive">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z"/>
+        </svg>
+        Google Drive
+      </button>
+      <button class="tab-btn" data-tab="tab-integrity">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Pruebas de Restauración & Integridad
+      </button>
+      <button class="tab-btn" data-tab="tab-dokploy">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+        </svg>
+        Despliegue Dokploy / VPS
+      </button>
+    </nav>
+
+    <!-- Tab 1: Historial de Copias -->
+    <section id="tab-backups" class="tab-content active">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Copias de Seguridad en Google Drive</h2>
+            <p class="card-desc">Transmisiones en tiempo real sin almacenamiento temporal en el disco del VPS.</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <select id="select-db-manual" class="form-select" style="min-width: 180px;">
+              <option value="">Seleccionar BD...</option>
+            </select>
+            <button class="btn btn-primary" id="btn-trigger-backup">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Ejecutar Copia Ahora
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Base de Datos</th>
+                <th>Archivo</th>
+                <th>Tamaño</th>
+                <th>Duración</th>
+                <th>Estado</th>
+                <th>Checksum SHA-256</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="table-backups-body">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                  Cargando historial de copias...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Configuración de Bases de Datos -->
+    <section id="tab-databases" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Bases de Datos a Copiar</h2>
+            <p class="card-desc">Configura conexiones de PostgreSQL y MySQL/MariaDB para respaldos automáticos.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-open-add-db">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Agregar Base de Datos
+          </button>
+        </div>
+
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Motor</th>
+                <th>Host & Puerto</th>
+                <th>Base de Datos</th>
+                <th>Usuario</th>
+                <th>SSL</th>
+                <th>Última Prueba</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="table-dbs-body">
+              <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                  Cargando bases de datos configuradas...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Configuración de Google Drive -->
+    <section id="tab-gdrive" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Configuración de Google Drive</h2>
+            <p class="card-desc">Credenciales para la subida por streaming directo hacia la nube.</p>
+          </div>
+          <button class="btn btn-secondary" id="btn-test-gdrive">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Probar Conexión con Drive
+          </button>
+        </div>
+
+        <form id="form-gdrive">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Método de Autenticación</label>
+              <select id="gdrive-auth-type" class="form-select">
+                <option value="service_account">Cuenta de Servicio (Service Account JSON - Recomendado)</option>
+                <option value="oauth">OAuth 2.0 (Refresh Token)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">ID de Carpeta en Google Drive</label>
+              <input type="text" id="gdrive-folder-id" class="form-input" placeholder="Ej: 1A2b3C4d5E6f7G8h9I0jK..." required>
+              <span class="stat-subtext">El ID que aparece al final de la URL en drive.google.com/drive/folders/<strong>ID</strong></span>
+            </div>
+
+            <!-- Service Account section -->
+            <div class="form-group full-width" id="section-sa-json">
+              <label class="form-label">Service Account JSON (Contenido de la llave .json)</label>
+              <textarea id="gdrive-sa-json" class="form-textarea" placeholder='{"type": "service_account", "project_id": "...", "private_key": "...", "client_email": "..."}'></textarea>
+              <span class="stat-subtext">💡 Recuerda compartir la carpeta de Google Drive con el correo <code>client_email</code> de la cuenta de servicio con permisos de Editor.</span>
+            </div>
+
+            <!-- OAuth section -->
+            <div class="form-group full-width" id="section-oauth" style="display: none;">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Client ID</label>
+                  <input type="text" id="gdrive-client-id" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Client Secret</label>
+                  <input type="password" id="gdrive-client-secret" class="form-input">
+                </div>
+                <div class="form-group full-width">
+                  <label class="form-label">Refresh Token</label>
+                  <input type="password" id="gdrive-refresh-token" class="form-input">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
+            <button type="submit" class="btn btn-primary">
+              Guardar Credenciales de Drive
+            </button>
+          </div>
+        </form>
+
+        <div class="dokploy-callout" style="margin-top: 1.5rem;">
+          <h4>
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            ¿Cómo funciona el streaming directo a Google Drive?
+          </h4>
+          <p>
+            Al ejecutarse la copia, el comando <code>pg_dump</code> o <code>mysqldump</code> escribe en la salida estándar (stdout), pasando inmediatamente por un compresor <code>gzip</code> en memoria y transmitiéndose por fragmentos HTTP directo al API de Google Drive. En ningún momento se guarda el archivo en el disco duro del VPS, evitando que se agote el espacio de almacenamiento.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Pruebas de Restauración & Integridad -->
+    <section id="tab-integrity" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Auditoría y Pruebas de Restauración</h2>
+            <p class="card-desc">Verifica que las copias no estén corruptas y sean 100% restaurables.</p>
+          </div>
+          <div class="badge badge-stream">Auto-Verificación Activada</div>
+        </div>
+
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID Test</th>
+                <th>Archivo de Backup</th>
+                <th>Tipo de Prueba</th>
+                <th>Estado</th>
+                <th>Tablas Verificadas</th>
+                <th>Duración</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="table-tests-body">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                  Cargando auditorías de restauración...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 5: Dokploy & VPS -->
+    <section id="tab-dokploy" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Despliegue en VPS con Dokploy</h2>
+            <p class="card-desc">Instrucciones y configuración para subir este servicio directamente a tu servidor.</p>
+          </div>
+          <span class="badge badge-success">Dokploy Compatible</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+          <div class="dokploy-callout">
+            <h4>Paso 1: Configurar en Dokploy</h4>
+            <p>
+              1. En tu panel de <strong>Dokploy</strong>, crea un nuevo <strong>Proyecto</strong> y añade una <strong>Aplicación</strong>.<br>
+              2. Conecta tu repositorio de GitHub / Git o selecciona <strong>Dockerfile</strong>.<br>
+              3. Dokploy detectará automáticamente el archivo <code>Dockerfile</code> optimizado que incluye <code>postgresql-client</code>, <code>mysql-client</code> y <code>node:22-alpine</code>.
+            </p>
+          </div>
+
+          <div class="dokploy-callout">
+            <h4>Paso 2: Montar Volumen Persistente</h4>
+            <p>
+              Para que las configuraciones de bases de datos y el historial no se borren al reiniciar el contenedor, añade este volumen en Dokploy:<br>
+              • <strong>Host Path / Volume:</strong> <code>job_db_data</code><br>
+              • <strong>Mount Path:</strong> <code>/app/data</code>
+            </p>
+          </div>
+
+          <div class="dokploy-callout">
+            <h4>Paso 3: Variables de Entorno (.env)</h4>
+            <p>Configura las variables en la pestaña <strong>Environment</strong> de Dokploy:</p>
+            <div class="terminal-box" style="margin-top: 0.5rem;">
+PORT=3000
+BACKUP_CRON=0 2 * * *
+TIMEZONE=America/Bogota
+DASHBOARD_PASSWORD=tu_clave_secreta
+
+# Opcional (si deseas precargar las credenciales sin usar la web):
+DEFAULT_DB_TYPE=postgres
+DEFAULT_DB_HOST=172.17.0.1
+DEFAULT_DB_PORT=5432
+DEFAULT_DB_NAME=mi_base_de_datos
+DEFAULT_DB_USER=postgres
+DEFAULT_DB_PASSWORD=mi_password
+
+GOOGLE_DRIVE_FOLDER_ID=1A2b3C4d5E...
+GOOGLE_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Agregar / Editar Base de Datos -->
+  <div class="modal-overlay" id="modal-db">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="card-title" id="modal-db-title">Configurar Base de Datos</h3>
+        <button class="close-btn" id="btn-close-db-modal">&times;</button>
+      </div>
+      <form id="form-db">
+        <div class="modal-body">
+          <input type="hidden" id="db-id">
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label class="form-label">Nombre Identificador</label>
+              <input type="text" id="db-name" class="form-input" placeholder="Ej: Base de Datos de Producción" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Motor de Base de Datos</label>
+              <select id="db-type" class="form-select">
+                <option value="postgres">PostgreSQL</option>
+                <option value="mysql">MySQL / MariaDB</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Host / IP</label>
+              <input type="text" id="db-host" class="form-input" placeholder="localhost o 172.17.0.1" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Puerto</label>
+              <input type="number" id="db-port" class="form-input" value="5432" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Nombre de la Base de Datos</label>
+              <input type="text" id="db-database" class="form-input" placeholder="mi_bd" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Usuario</label>
+              <input type="text" id="db-user" class="form-input" placeholder="postgres" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Contraseña</label>
+              <input type="password" id="db-password" class="form-input" placeholder="••••••••">
+            </div>
+
+            <div class="form-group full-width">
+              <label class="form-checkbox-label">
+                <input type="checkbox" id="db-ssl"> Requerir conexión segura SSL (Recomendado para servidores externos)
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-test-db-conn">Probar Conexión</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Visor de Logs de Integridad -->
+  <div class="modal-overlay" id="modal-logs">
+    <div class="modal" style="max-width: 800px;">
+      <div class="modal-header">
+        <h3 class="card-title">Registro de Auditoría de Restauración</h3>
+        <button class="close-btn" id="btn-close-logs-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="terminal-box" id="logs-content">Cargando registros...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-close-logs">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

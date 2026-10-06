@@ -1,0 +1,604 @@
+// StreamVault DB Dashboard Client
+document.addEventListener('DOMContentLoaded', () => {
+  // Elements
+  const tabs = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  const btnRefresh = document.getElementById('btn-refresh');
+  const toastContainer = document.getElementById('toast-container');
+
+  // Stats Elements
+  const statTotalBackups = document.getElementById('stat-total-backups');
+  const statSuccessRate = document.getElementById('stat-success-rate');
+  const statTotalBytes = document.getElementById('stat-total-bytes');
+  const statCronSchedule = document.getElementById('stat-cron-schedule');
+  const statTestPassRate = document.getElementById('stat-test-pass-rate');
+  const statTestCount = document.getElementById('stat-test-count');
+  const badgeDriveStatus = document.getElementById('badge-drive-status');
+
+  // Tables & Selects
+  const tableBackupsBody = document.getElementById('table-backups-body');
+  const tableDbsBody = document.getElementById('table-dbs-body');
+  const tableTestsBody = document.getElementById('table-tests-body');
+  const selectDbManual = document.getElementById('select-db-manual');
+  const btnTriggerBackup = document.getElementById('btn-trigger-backup');
+
+  // Modals
+  const modalDb = document.getElementById('modal-db');
+  const btnOpenAddDb = document.getElementById('btn-open-add-db');
+  const btnCloseDbModal = document.getElementById('btn-close-db-modal');
+  const formDb = document.getElementById('form-db');
+  const btnTestDbConn = document.getElementById('btn-test-db-conn');
+  const dbTypeSelect = document.getElementById('db-type');
+  const dbPortInput = document.getElementById('db-port');
+
+  const modalLogs = document.getElementById('modal-logs');
+  const btnCloseLogsModal = document.getElementById('btn-close-logs-modal');
+  const btnCloseLogs = document.getElementById('btn-close-logs');
+  const logsContent = document.getElementById('logs-content');
+
+  // Google Drive Form
+  const formGdrive = document.getElementById('form-gdrive');
+  const gdriveAuthType = document.getElementById('gdrive-auth-type');
+  const gdriveFolderId = document.getElementById('gdrive-folder-id');
+  const gdriveSaJson = document.getElementById('gdrive-sa-json');
+  const gdriveClientId = document.getElementById('gdrive-client-id');
+  const gdriveClientSecret = document.getElementById('gdrive-client-secret');
+  const gdriveRefreshToken = document.getElementById('gdrive-refresh-token');
+  const sectionSaJson = document.getElementById('section-sa-json');
+  const sectionOauth = document.getElementById('section-oauth');
+  const btnTestGdrive = document.getElementById('btn-test-gdrive');
+
+  // Helpers
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function formatDate(isoStr) {
+    if (!isoStr) return '-';
+    const d = new Date(isoStr);
+    return d.toLocaleString('es-ES', {
+      month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  }
+
+  function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
+  }
+
+  // Tab Switching
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+
+      tab.classList.add('active');
+      const target = document.getElementById(tab.dataset.tab);
+      if (target) target.classList.add('active');
+    });
+  });
+
+  // DB Type port switch
+  dbTypeSelect.addEventListener('change', () => {
+    if (dbTypeSelect.value === 'mysql') {
+      if (dbPortInput.value === '5432') dbPortInput.value = '3306';
+    } else {
+      if (dbPortInput.value === '3306') dbPortInput.value = '5432';
+    }
+  });
+
+  // Google Drive Auth switcher
+  gdriveAuthType.addEventListener('change', () => {
+    if (gdriveAuthType.value === 'service_account') {
+      sectionSaJson.style.display = 'block';
+      sectionOauth.style.display = 'none';
+    } else {
+      sectionSaJson.style.display = 'none';
+      sectionOauth.style.display = 'block';
+    }
+  });
+
+  // API Calls
+  async function fetchStatus() {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      if (!data.success) return;
+
+      statTotalBackups.textContent = data.stats.totalBackups;
+      statSuccessRate.textContent = `Tasa de éxito: ${data.stats.successRate}% (${data.stats.successfulBackups} exitosos)`;
+      statTotalBytes.textContent = formatBytes(data.stats.totalBytesUploaded);
+      statCronSchedule.textContent = data.scheduler.activeSchedule;
+      statTestPassRate.textContent = `${data.stats.testPassRate}%`;
+      statTestCount.textContent = `${data.stats.totalRestoreTests} pruebas (${data.stats.passedRestoreTests} aprobadas)`;
+
+      if (data.hasDriveConfig) {
+        badgeDriveStatus.className = 'badge badge-success';
+        badgeDriveStatus.innerHTML = '<span class="pulse-dot"></span> Google Drive Conectado';
+      } else {
+        badgeDriveStatus.className = 'badge badge-warning';
+        badgeDriveStatus.innerHTML = '<span class="pulse-dot"></span> Configurar Google Drive';
+      }
+    } catch (err) {
+      console.error('Error fetching status:', err);
+    }
+  }
+
+  async function fetchDatabases() {
+    try {
+      const res = await fetch('/api/db-configs');
+      const json = await res.json();
+      if (!json.success) return;
+
+      const dbs = json.data;
+      // Populate select dropdown
+      selectDbManual.innerHTML = '<option value="">Seleccionar BD...</option>';
+      dbs.forEach(db => {
+        const opt = document.createElement('option');
+        opt.value = db.id;
+        opt.textContent = `${db.name} (${db.type.toUpperCase()} - ${db.database_name})`;
+        selectDbManual.appendChild(opt);
+      });
+
+      // Populate Table
+      if (dbs.length === 0) {
+        tableDbsBody.innerHTML = `
+          <tr>
+            <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No hay bases de datos configuradas todavía. Haz clic en "Agregar Base de Datos".
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableDbsBody.innerHTML = dbs.map(db => `
+        <tr>
+          <td><strong>${db.name}</strong></td>
+          <td><span class="badge ${db.type === 'postgres' ? 'badge-stream' : 'badge-warning'}">${db.type.toUpperCase()}</span></td>
+          <td class="mono-cell">${db.host}:${db.port}</td>
+          <td><code>${db.database_name}</code></td>
+          <td>${db.username}</td>
+          <td>${db.ssl ? '✅ Sí' : '❌ No'}</td>
+          <td>${formatDate(db.last_tested_at)}</td>
+          <td>
+            ${db.test_status === 'SUCCESS' ? '<span class="badge badge-success">Conectado</span>' :
+              db.test_status === 'FAILED' ? `<span class="badge badge-danger" title="${db.test_error || ''}">Error</span>` :
+              '<span class="badge badge-warning">Sin probar</span>'}
+          </td>
+          <td>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn btn-secondary btn-sm btn-edit-db" data-id="${db.id}">Editar</button>
+              <button class="btn btn-danger btn-sm btn-delete-db" data-id="${db.id}">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      // Add listeners to actions
+      document.querySelectorAll('.btn-edit-db').forEach(btn => {
+        btn.addEventListener('click', () => editDb(btn.dataset.id));
+      });
+      document.querySelectorAll('.btn-delete-db').forEach(btn => {
+        btn.addEventListener('click', () => deleteDb(btn.dataset.id));
+      });
+    } catch (err) {
+      console.error('Error fetching databases:', err);
+    }
+  }
+
+  async function fetchBackups() {
+    try {
+      const res = await fetch('/api/backups?limit=50');
+      const json = await res.json();
+      if (!json.success) return;
+
+      const backups = json.data;
+      if (backups.length === 0) {
+        tableBackupsBody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              Aún no se han generado copias de seguridad. Usa "Ejecutar Copia Ahora" para iniciar la primera transmisión.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableBackupsBody.innerHTML = backups.map(b => `
+        <tr>
+          <td><strong>${b.database_name}</strong> <span class="badge ${b.db_type === 'postgres' ? 'badge-stream' : 'badge-warning'} btn-sm">${b.db_type.toUpperCase()}</span></td>
+          <td class="mono-cell">${b.filename}</td>
+          <td><strong>${formatBytes(b.size_bytes)}</strong></td>
+          <td>${b.duration_ms ? (b.duration_ms / 1000).toFixed(1) + 's' : '-'}</td>
+          <td>
+            ${b.status === 'SUCCESS' ? '<span class="badge badge-success">Subido a Drive</span>' :
+              b.status === 'STREAMING' ? '<span class="badge badge-stream"><span class="pulse-dot"></span> Transmitiendo...</span>' :
+              `<span class="badge badge-danger" title="${b.error_message || ''}">Falló</span>`}
+          </td>
+          <td class="mono-cell" title="${b.checksum_sha256 || ''}">
+            ${b.checksum_sha256 ? b.checksum_sha256.substring(0, 10) + '...' : '-'}
+          </td>
+          <td>${formatDate(b.created_at)}</td>
+          <td>
+            <div style="display: flex; gap: 0.4rem;">
+              ${b.gdrive_file_id ? `
+                <a href="${b.gdrive_url || `https://drive.google.com/file/d/${b.gdrive_file_id}/view`}" target="_blank" class="btn btn-secondary btn-sm" title="Abrir en Google Drive">
+                  Drive ↗
+                </a>
+                <button class="btn btn-primary btn-sm btn-verify-backup" data-id="${b.id}" title="Verificar Integridad & Restauración">
+                  Auditar
+                </button>
+              ` : '-'}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      document.querySelectorAll('.btn-verify-backup').forEach(btn => {
+        btn.addEventListener('click', () => triggerIntegrityTest(btn.dataset.id));
+      });
+    } catch (err) {
+      console.error('Error fetching backups:', err);
+    }
+  }
+
+  async function fetchRestoreTests() {
+    try {
+      const res = await fetch('/api/restore-tests?limit=50');
+      const json = await res.json();
+      if (!json.success) return;
+
+      const tests = json.data;
+      if (tests.length === 0) {
+        tableTestsBody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No se han ejecutado pruebas de integridad aún.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableTestsBody.innerHTML = tests.map(t => `
+        <tr>
+          <td>#${t.id}</td>
+          <td class="mono-cell">${t.filename || `Backup #${t.backup_history_id}`}</td>
+          <td><span class="badge badge-stream">${t.test_type}</span></td>
+          <td>
+            ${t.status === 'PASSED' ? '<span class="badge badge-success">100% Íntegro</span>' :
+              t.status === 'RUNNING' ? '<span class="badge badge-stream"><span class="pulse-dot"></span> Ejecutando...</span>' :
+              `<span class="badge badge-danger" title="${t.error_message || ''}">Falló</span>`}
+          </td>
+          <td><strong>${t.tables_verified || 0}</strong> tablas</td>
+          <td>${t.duration_ms ? (t.duration_ms / 1000).toFixed(1) + 's' : '-'}</td>
+          <td>${formatDate(t.created_at)}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm btn-view-logs" data-id="${t.id}" data-logs="${encodeURIComponent(t.logs || t.error_message || '')}">
+              Ver Registros
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.querySelectorAll('.btn-view-logs').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const raw = decodeURIComponent(btn.dataset.logs);
+          logsContent.textContent = raw || 'No hay registros detallados disponibles.';
+          modalLogs.classList.add('open');
+        });
+      });
+    } catch (err) {
+      console.error('Error fetching restore tests:', err);
+    }
+  }
+
+  async function fetchGDriveConfig() {
+    try {
+      const res = await fetch('/api/gdrive-config');
+      const json = await res.json();
+      if (json.success && json.data) {
+        const d = json.data;
+        gdriveAuthType.value = d.auth_type;
+        gdriveFolderId.value = d.folder_id;
+        if (d.auth_type === 'service_account') {
+          sectionSaJson.style.display = 'block';
+          sectionOauth.style.display = 'none';
+        } else {
+          sectionSaJson.style.display = 'none';
+          sectionOauth.style.display = 'block';
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching Google Drive config:', err);
+    }
+  }
+
+  // Trigger Manual Backup
+  btnTriggerBackup.addEventListener('click', async () => {
+    const dbId = selectDbManual.value;
+    if (!dbId) {
+      showToast('Por favor selecciona una base de datos para respaldar.', 'error');
+      return;
+    }
+
+    try {
+      btnTriggerBackup.disabled = true;
+      btnTriggerBackup.innerHTML = '<span class="pulse-dot"></span> Iniciando streaming...';
+      showToast('Iniciando transmisión directa a Google Drive...', 'info');
+
+      const res = await fetch(`/api/backups/trigger/${dbId}`, { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message, 'success');
+        await fetchBackups();
+        await fetchStatus();
+      } else {
+        showToast('Error: ' + json.error, 'error');
+      }
+    } catch (err) {
+      showToast('Error al iniciar copia: ' + err.message, 'error');
+    } finally {
+      btnTriggerBackup.disabled = false;
+      btnTriggerBackup.innerHTML = `
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Ejecutar Copia Ahora
+      `;
+    }
+  });
+
+  // Trigger Integrity Test
+  async function triggerIntegrityTest(backupId) {
+    try {
+      showToast(`Iniciando prueba de integridad para backup #${backupId}...`, 'info');
+      const res = await fetch(`/api/restore-tests/trigger/${backupId}`, { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        showToast('Auditoría iniciada. Revisa la pestaña Pruebas de Restauración.', 'success');
+        // Switch to tab
+        document.querySelector('[data-tab="tab-integrity"]').click();
+        await fetchRestoreTests();
+        await fetchStatus();
+      } else {
+        showToast('Error: ' + json.error, 'error');
+      }
+    } catch (err) {
+      showToast('Error al auditar backup: ' + err.message, 'error');
+    }
+  }
+
+  // Database Modal Handlers
+  btnOpenAddDb.addEventListener('click', () => {
+    formDb.reset();
+    document.getElementById('db-id').value = '';
+    document.getElementById('modal-db-title').textContent = 'Agregar Nueva Base de Datos';
+    modalDb.classList.add('open');
+  });
+
+  btnCloseDbModal.addEventListener('click', () => modalDb.classList.remove('open'));
+
+  async function editDb(id) {
+    try {
+      const res = await fetch('/api/db-configs');
+      const json = await res.json();
+      const db = json.data.find(d => d.id === Number(id));
+      if (!db) return;
+
+      document.getElementById('db-id').value = db.id;
+      document.getElementById('db-name').value = db.name;
+      document.getElementById('db-type').value = db.type;
+      document.getElementById('db-host').value = db.host;
+      document.getElementById('db-port').value = db.port;
+      document.getElementById('db-database').value = db.database_name;
+      document.getElementById('db-user').value = db.username;
+      document.getElementById('db-password').value = '';
+      document.getElementById('db-ssl').checked = Boolean(db.ssl);
+
+      document.getElementById('modal-db-title').textContent = 'Editar Base de Datos: ' + db.name;
+      modalDb.classList.add('open');
+    } catch (err) {
+      showToast('Error al cargar datos: ' + err.message, 'error');
+    }
+  }
+
+  async function deleteDb(id) {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta configuración de base de datos?')) return;
+    try {
+      const res = await fetch(`/api/db-configs/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        showToast('Base de datos eliminada.', 'success');
+        await fetchDatabases();
+      } else {
+        showToast('Error: ' + json.error, 'error');
+      }
+    } catch (err) {
+      showToast('Error al eliminar: ' + err.message, 'error');
+    }
+  }
+
+  // Save DB Form
+  formDb.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('db-id').value;
+    const payload = {
+      name: document.getElementById('db-name').value,
+      type: document.getElementById('db-type').value,
+      host: document.getElementById('db-host').value,
+      port: parseInt(document.getElementById('db-port').value, 10),
+      database_name: document.getElementById('db-database').value,
+      username: document.getElementById('db-user').value,
+      password: document.getElementById('db-password').value,
+      ssl: document.getElementById('db-ssl').checked,
+    };
+
+    try {
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `/api/db-configs/${id}` : '/api/db-configs';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast('Base de datos guardada exitosamente.', 'success');
+        modalDb.classList.remove('open');
+        await fetchDatabases();
+        await fetchStatus();
+      } else {
+        showToast('Error: ' + json.error, 'error');
+      }
+    } catch (err) {
+      showToast('Error al guardar: ' + err.message, 'error');
+    }
+  });
+
+  // Test DB Connection
+  btnTestDbConn.addEventListener('click', async () => {
+    const payload = {
+      type: document.getElementById('db-type').value,
+      host: document.getElementById('db-host').value,
+      port: parseInt(document.getElementById('db-port').value, 10),
+      database_name: document.getElementById('db-database').value,
+      username: document.getElementById('db-user').value,
+      password: document.getElementById('db-password').value,
+      ssl: document.getElementById('db-ssl').checked,
+    };
+
+    if (!payload.host || !payload.database_name || !payload.username) {
+      showToast('Por favor completa los campos principales antes de probar.', 'error');
+      return;
+    }
+
+    try {
+      btnTestDbConn.disabled = true;
+      btnTestDbConn.textContent = 'Probando conexión...';
+      const res = await fetch('/api/db-configs/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(`✅ Conexión exitosa (${json.result.latencyMs}ms)`, 'success');
+      } else {
+        showToast('❌ Falló la conexión: ' + json.error, 'error');
+      }
+    } catch (err) {
+      showToast('Error al probar: ' + err.message, 'error');
+    } finally {
+      btnTestDbConn.disabled = false;
+      btnTestDbConn.textContent = 'Probar Conexión';
+    }
+  });
+
+  // Save Google Drive Form
+  formGdrive.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      auth_type: gdriveAuthType.value,
+      folder_id: gdriveFolderId.value,
+      service_account_json: gdriveSaJson.value,
+      client_id: gdriveClientId.value,
+      client_secret: gdriveClientSecret.value,
+      refresh_token: gdriveRefreshToken.value,
+    };
+
+    try {
+      const res = await fetch('/api/gdrive-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast('Credenciales de Google Drive guardadas.', 'success');
+        await fetchStatus();
+      } else {
+        showToast('Error: ' + json.error, 'error');
+      }
+    } catch (err) {
+      showToast('Error al guardar credenciales: ' + err.message, 'error');
+    }
+  });
+
+  // Test Google Drive
+  btnTestGdrive.addEventListener('click', async () => {
+    const payload = {
+      auth_type: gdriveAuthType.value,
+      folder_id: gdriveFolderId.value,
+      service_account_json: gdriveSaJson.value,
+      client_id: gdriveClientId.value,
+      client_secret: gdriveClientSecret.value,
+      refresh_token: gdriveRefreshToken.value,
+    };
+
+    if (!payload.folder_id) {
+      showToast('Por favor introduce el ID de la carpeta de Drive.', 'error');
+      return;
+    }
+
+    try {
+      btnTestGdrive.disabled = true;
+      btnTestGdrive.textContent = 'Verificando Google Drive...';
+      const res = await fetch('/api/gdrive-config/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(`✅ Conectado a Drive: ${json.result.folderName} (${json.result.account})`, 'success');
+        await fetchStatus();
+      } else {
+        showToast('❌ Error de Drive: ' + json.error, 'error');
+      }
+    } catch (err) {
+      showToast('Error al verificar: ' + err.message, 'error');
+    } finally {
+      btnTestGdrive.disabled = false;
+      btnTestGdrive.textContent = 'Probar Conexión con Drive';
+    }
+  });
+
+  // Logs Modal Close
+  btnCloseLogsModal.addEventListener('click', () => modalLogs.classList.remove('open'));
+  btnCloseLogs.addEventListener('click', () => modalLogs.classList.remove('open'));
+
+  // Refresh Button
+  btnRefresh.addEventListener('click', async () => {
+    showToast('Actualizando datos...', 'info');
+    await Promise.all([fetchStatus(), fetchDatabases(), fetchBackups(), fetchRestoreTests()]);
+  });
+
+  // Initial Boot
+  fetchStatus();
+  fetchDatabases();
+  fetchBackups();
+  fetchRestoreTests();
+  fetchGDriveConfig();
+
+  // Background Auto-Refresh every 6 seconds
+  setInterval(() => {
+    fetchStatus();
+    fetchBackups();
+    fetchRestoreTests();
+  }, 6000);
+});

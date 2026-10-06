@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db-backup-streamer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: streamvault-backup-job
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - DATA_DIR=/app/data
+      - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
+      - TIMEZONE=${TIMEZONE:-UTC}
+      - DASHBOARD_USERNAME=${DASHBOARD_USERNAME:-admin}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-}
+      # Default DB settings (optional, can also be configured via Web UI)
+      - DEFAULT_DB_TYPE=${DEFAULT_DB_TYPE:-postgres}
+      - DEFAULT_DB_HOST=${DEFAULT_DB_HOST:-}
+      - DEFAULT_DB_PORT=${DEFAULT_DB_PORT:-5432}
+      - DEFAULT_DB_NAME=${DEFAULT_DB_NAME:-}
+      - DEFAULT_DB_USER=${DEFAULT_DB_USER:-}
+      - DEFAULT_DB_PASSWORD=${DEFAULT_DB_PASSWORD:-}
+      - DEFAULT_DB_SSL=${DEFAULT_DB_SSL:-false}
+      # Google Drive settings (optional, can also be configured via Web UI)
+      - GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID:-}
+      - GOOGLE_SERVICE_ACCOUNT_KEY=${GOOGLE_SERVICE_ACCOUNT_KEY:-}
+    volumes:
+      - job_db_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  job_db_data:
+    driver: local

@@ -1,0 +1,10 @@
+node_modules
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.json
+.env
+.DS_Store
+*.log
+stitch-*.js
+data/
