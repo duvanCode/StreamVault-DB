@@ -11,13 +11,13 @@ ENV NODE_ENV=production \
     DATA_DIR=/app/data
 
 # Install native database client utilities, compression tools & curl for healthcheck
-# - postgresql16-client: provides pg_dump, pg_restore, psql
+# - postgresql17-client: provides pg_dump, pg_restore, psql (compatible with PostgreSQL 17, 16, 15, 14, etc.)
 # - mysql-client / mariadb-client: provides mysqldump, mysql
 # - gzip: fast on-the-fly streaming compression
 # - tzdata: timezone support for accurate cron scheduling
 RUN apk update && \
+    (apk add --no-cache postgresql17-client || apk add --no-cache postgresql17-client --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main || apk add --no-cache postgresql-client) && \
     apk add --no-cache \
-      postgresql16-client \
       mysql-client \
       gzip \
       bash \
