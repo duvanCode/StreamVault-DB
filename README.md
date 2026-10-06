@@ -74,19 +74,20 @@ Para que el servicio pueda subir archivos automáticamente a tu Google Drive sin
 1. En tu panel de **Dokploy**, crea un nuevo **Proyecto** y añade una **Aplicación**.
 2. Conecta tu repositorio de GitHub / Git donde tengas este proyecto.
 3. Dokploy detectará automáticamente el archivo `Dockerfile`.
-4. En la pestaña **Volúmenes (Volumes)**, crea un volumen persistente:
+4. En el campo **Port** de la aplicación en Dokploy, coloca el puerto que desees exponer (ej: `3000`, `8080`, `5000`, etc.).
+5. En la pestaña **Volúmenes (Volumes)**, crea un volumen persistente:
    - **Nombre / Host Path:** `job_db_data`
    - **Mount Path:** `/app/data`
-5. En la pestaña **Environment**, define tus variables (o usa el archivo `.env`):
+6. En la pestaña **Environment**, define tus variables (o usa el archivo `.env`):
    ```env
-   PORT=3000
+   PORT=3000  # O el puerto que hayas configurado en el campo Port de Dokploy
    BACKUP_CRON=0 2 * * *
    TIMEZONE=America/Bogota
    DASHBOARD_PASSWORD=clave_segura_de_acceso
    GOOGLE_DRIVE_FOLDER_ID=1A2b3C4d5E...
    ```
-6. En la pestaña **Dominios (Domains)**, asigna tu subdominio (ej: `backups.tudominio.com`) con HTTPS automático generado por Dokploy/Traefik.
-7. Haz clic en **Deploy**. ¡Listo!
+7. En la pestaña **Dominios (Domains)**, asigna tu subdominio (ej: `backups.tudominio.com`) con HTTPS automático generado por Dokploy/Traefik.
+8. Haz clic en **Deploy**. ¡Listo!
 
 ### Opción B: Despliegue con Docker Compose
 Si prefieres usar la sección **Compose** de Dokploy o correrlo por consola en tu VPS:

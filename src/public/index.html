@@ -346,7 +346,8 @@
             <p>
               1. En tu panel de <strong>Dokploy</strong>, crea un nuevo <strong>Proyecto</strong> y añade una <strong>Aplicación</strong>.<br>
               2. Conecta tu repositorio de GitHub / Git o selecciona <strong>Dockerfile</strong>.<br>
-              3. Dokploy detectará automáticamente el archivo <code>Dockerfile</code> optimizado que incluye <code>postgresql-client</code>, <code>mysql-client</code> y <code>node:22-alpine</code>.
+              3. Dokploy detectará automáticamente el archivo <code>Dockerfile</code> optimizado que incluye <code>postgresql-client</code>, <code>mysql-client</code> y <code>node:22-alpine</code>.<br>
+              4. En la casilla <strong>Port</strong> de la aplicación en Dokploy, coloca el mismo puerto definido en la variable <code>PORT</code> (por defecto <code>3000</code>, o cualquier puerto que desees como <code>8080</code>, <code>5000</code>, etc.).
             </p>
           </div>
 
@@ -363,7 +364,7 @@
             <h4>Paso 3: Variables de Entorno (.env)</h4>
             <p>Configura las variables en la pestaña <strong>Environment</strong> de Dokploy:</p>
             <div class="terminal-box" style="margin-top: 0.5rem;">
-PORT=3000
+PORT=3000 # O el puerto que elijas para Dokploy (ej: 8080, 5000)
 BACKUP_CRON=0 2 * * *
 TIMEZONE=America/Bogota
 DASHBOARD_PASSWORD=tu_clave_secreta

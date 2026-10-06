@@ -8,7 +8,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 module.exports = {
-  PORT: parseInt(process.env.PORT, 10) || 3000,
+  PORT: parseInt(process.env.PORT || process.env.APP_PORT || process.env.DOKPLOY_PORT, 10) || 3000,
   HOST: process.env.HOST || '0.0.0.0',
   DATA_DIR,
   DB_FILE: path.join(DATA_DIR, 'backup_service.db'),

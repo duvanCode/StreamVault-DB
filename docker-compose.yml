@@ -8,9 +8,9 @@ services:
     container_name: streamvault-backup-job
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     environment:
-      - PORT=3000
+      - PORT=${PORT:-3000}
       - HOST=0.0.0.0
       - DATA_DIR=/app/data
       - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
@@ -31,7 +31,7 @@ services:
     volumes:
       - job_db_data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-3000}/api/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

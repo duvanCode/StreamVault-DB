@@ -41,9 +41,9 @@ COPY . .
 # Expose Web Dashboard Port
 EXPOSE 3000
 
-# Docker / Dokploy Healthcheck
+# Docker / Dokploy Healthcheck with dynamic PORT support
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD sh -c 'curl -f "http://localhost:${PORT:-3000}/api/health" || exit 1'
 
 # Start service
 CMD ["node", "src/server.js"]
