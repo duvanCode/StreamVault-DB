@@ -409,6 +409,10 @@ router.post('/gdrive/oauth/url', (req, res) => {
       return res.status(400).json({ success: false, error: 'Client ID es requerido para conectar con Google.' });
     }
 
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const redirectUri = redirect_uri || `${proto}://${host}/api/gdrive/oauth/callback`;
+
     const current = storage.getGDriveConfig() || {};
     // Pre-save client_id, client_secret and folder_id before redirecting
     storage.saveGDriveConfig({
@@ -418,7 +422,7 @@ router.post('/gdrive/oauth/url', (req, res) => {
       folder_id: folder_id || current.folder_id || 'root',
     });
 
-    const state = Buffer.from(JSON.stringify({ redirectUri: redirect_uri })).toString('base64url');
+    const state = Buffer.from(JSON.stringify({ redirectUri })).toString('base64url');
     const authUrl = GoogleDriveService.generateAuthUrl({
       clientId: client_id,
       clientSecret: client_secret || current.client_secret || '',
@@ -426,7 +430,7 @@ router.post('/gdrive/oauth/url', (req, res) => {
       state,
     });
 
-    res.json({ success: true, url: authUrl });
+    res.json({ success: true, url: authUrl, redirectUri });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -440,9 +444,13 @@ router.post('/gdrive/oauth/exchange', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Client ID, Client Secret y Código de autorización son requeridos.' });
     }
 
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const redirectUri = redirect_uri || `${proto}://${host}/api/gdrive/oauth/callback`;
+
     const tokens = await GoogleDriveService.exchangeCodeForTokens({
-      clientId,
-      clientSecret,
+      clientId: client_id,
+      clientSecret: client_secret,
       redirectUri,
       code,
     });
