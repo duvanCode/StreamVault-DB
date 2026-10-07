@@ -1,584 +1,974 @@
 <!DOCTYPE html>
-<html lang="es">
+<html class="dark" lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StreamVault DB - Backup Streamer & Restore to Google Drive</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css">
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>StreamVault DB - Automated Database Streaming & Restore to Google Drive</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-tint": "#7bd0ff",
+            "on-primary-fixed": "#001e2c",
+            "inverse-on-surface": "#283044",
+            "on-secondary": "#003824",
+            "surface-bright": "#31394d",
+            "surface-container-lowest": "#060e20",
+            "background": "#0b1326",
+            "on-secondary-container": "#00311f",
+            "on-error": "#690005",
+            "surface-container-high": "#222a3d",
+            "tertiary-fixed-dim": "#b4c5ff",
+            "secondary-fixed-dim": "#4edea3",
+            "tertiary-container": "#94aeff",
+            "on-surface": "#dae2fd",
+            "surface-container": "#171f33",
+            "primary": "#8ed5ff",
+            "surface-variant": "#2d3449",
+            "on-tertiary-fixed-variant": "#003ea8",
+            "on-primary-container": "#004965",
+            "error-container": "#93000a",
+            "secondary": "#4edea3",
+            "inverse-primary": "#00668a",
+            "on-primary": "#00354a",
+            "secondary-fixed": "#6ffbbe",
+            "surface-container-highest": "#2d3449",
+            "error": "#ffb4ab",
+            "on-background": "#dae2fd",
+            "on-tertiary-container": "#003ba1",
+            "on-surface-variant": "#bdc8d1",
+            "surface-dim": "#0b1326",
+            "primary-fixed": "#c4e7ff",
+            "on-primary-fixed-variant": "#004c69",
+            "tertiary": "#bccbff",
+            "on-tertiary-fixed": "#00174b",
+            "on-secondary-fixed": "#002113",
+            "on-secondary-fixed-variant": "#005236",
+            "on-error-container": "#ffdad6",
+            "outline": "#87929a",
+            "surface-container-low": "#131b2e",
+            "surface": "#0b1326",
+            "outline-variant": "#3e484f",
+            "primary-container": "#38bdf8",
+            "primary-fixed-dim": "#7bd0ff",
+            "tertiary-fixed": "#dbe1ff",
+            "on-tertiary": "#002a78",
+            "inverse-surface": "#dae2fd",
+            "secondary-container": "#00a572"
+          },
+          fontFamily: {
+            "sans": ["Inter", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"],
+            "headline-xl": ["Inter"],
+            "headline-lg": ["Inter"],
+            "headline-md": ["Inter"],
+            "headline-sm": ["Inter"],
+            "body-lg": ["Inter"],
+            "body-md": ["Inter"],
+            "body-sm": ["Inter"],
+            "label-md": ["Inter"],
+            "label-sm": ["JetBrains Mono"],
+            "code-lg": ["JetBrains Mono"],
+            "code-md": ["JetBrains Mono"],
+            "code-sm": ["JetBrains Mono"]
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/css/style.css"/>
 </head>
-<body>
-  <!-- Stitch Cyber Lock Screen Overlay -->
-  <div class="lock-screen-overlay hidden" id="lock-screen-overlay">
-    <div class="lock-card">
-      <div class="lock-icon-glow">
-        <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-        </svg>
-      </div>
-      <h2 class="lock-title">StreamVault DB</h2>
-      <p class="lock-subtitle">Panel protegido. Introduce tu llave de acceso para continuar.</p>
+<body class="bg-background text-on-surface antialiased min-h-screen flex flex-col font-sans text-sm selection:bg-primary-container selection:text-on-primary-fixed">
 
-      <form id="form-lock-screen">
-        <div class="lock-error-alert" id="lock-error-alert" style="display: none;">
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
-          <span id="lock-error-text">Llave de acceso incorrecta.</span>
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Stitch Cyber Lock Screen Overlay (Screen 45f3fec9b10b4b8684f5a9e3dadeeb38) -->
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-md hidden" id="lock-screen-overlay">
+    <!-- Ambient Cybernetic Grid & Radial Backlight -->
+    <div class="fixed inset-0 pointer-events-none z-0 cyber-grid opacity-60"></div>
+    <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[680px] h-[680px] bg-primary-container/10 rounded-full blur-[140px] pointer-events-none z-0"></div>
+    <div class="fixed top-12 left-1/2 -translate-x-1/2 w-[380px] h-[200px] bg-secondary-container/10 rounded-full blur-[100px] pointer-events-none z-0"></div>
+
+    <div class="w-full max-w-[490px] relative z-10">
+      <!-- Elevated Obsidian Surface Container -->
+      <div class="relative bg-surface-container-low/95 backdrop-blur-xl border border-outline-variant rounded-xl p-6 sm:p-8 neon-cyan-glow transition-all duration-300">
+        <!-- Top Edge Precision Accent Line -->
+        <div class="absolute top-0 inset-x-8 h-[2px] bg-gradient-to-r from-transparent via-primary-container to-transparent opacity-80"></div>
+
+        <!-- Glowing Cyber Lock Icon Badge -->
+        <div class="flex flex-col items-center text-center mb-6">
+          <div class="relative mb-4">
+            <div class="absolute -inset-2 rounded-full bg-primary-container/20 neon-pulse-ring blur-sm"></div>
+            <div class="relative w-14 h-14 rounded-full bg-surface-container-high border border-primary/40 flex items-center justify-center shadow-lg">
+              <span class="material-symbols-outlined text-primary text-[28px]" style="font-variation-settings: 'FILL' 1;">shield_lock</span>
+            </div>
+            <!-- Secondary Mini Badge Status -->
+            <div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-surface-container-lowest border border-outline-variant flex items-center justify-center">
+              <span class="material-symbols-outlined text-secondary text-[13px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+            </div>
+          </div>
+          <h1 class="font-headline-md text-[20px] text-on-surface font-semibold tracking-tight mb-1.5">StreamVault DB • Access Protected</h1>
+          <p class="font-body-sm text-[13px] text-on-surface-variant max-w-[360px]">
+            Ingresa tu llave de acceso secreta (ACCESS_KEY) para autenticar la consola de administración.
+          </p>
         </div>
 
-        <div class="lock-input-group">
-          <input type="password" id="input-access-key" class="lock-input" placeholder="••••••••••••••••" autocomplete="current-password" required autofocus>
-          <button type="button" class="lock-toggle-visibility" id="btn-toggle-key-visibility" title="Mostrar/Ocultar clave">
-            <svg id="icon-eye-show" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            </svg>
-            <svg id="icon-eye-hide" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>
-            </svg>
+        <!-- Dismissable Error Alert Banner -->
+        <div class="mb-5 bg-error-container/25 border border-error/30 rounded-lg p-3 flex items-start justify-between gap-2.5 transition-all" id="lock-error-alert" style="display: none;">
+          <div class="flex items-start gap-2.5">
+            <span class="material-symbols-outlined text-error text-[18px] mt-0.5 shrink-0">warning</span>
+            <div>
+              <div class="font-semibold text-error text-xs leading-tight">Autenticación Rechazada</div>
+              <div class="font-mono text-[11px] text-on-surface-variant mt-0.5" id="lock-error-text">
+                Llave de acceso incorrecta o firma inválida.
+              </div>
+            </div>
+          </div>
+          <button aria-label="Dismiss alert" class="text-on-surface-variant hover:text-on-surface p-0.5 rounded" onclick="document.getElementById('lock-error-alert').style.display='none'" type="button">
+            <span class="material-symbols-outlined text-[16px]">close</span>
           </button>
         </div>
 
-        <button type="submit" class="btn btn-primary lock-btn" id="btn-unlock">
-          Desbloquear Panel
-        </button>
-      </form>
+        <!-- Authentication Form -->
+        <form class="space-y-4" id="form-lock-screen">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs text-on-surface-variant font-medium" for="input-access-key">
+                Llave de Acceso del Clúster (ACCESS_KEY)
+              </label>
+            </div>
+            <div class="relative flex items-center">
+              <input autocomplete="current-password" class="w-full bg-surface-container-lowest border border-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container text-on-surface font-mono text-sm rounded-lg h-11 pl-3.5 pr-20 placeholder:text-outline/60 transition-colors" id="input-access-key" placeholder="••••••••••••••••••••••••••••" required="" spellcheck="false" type="password"/>
+              <!-- Field Actions: Paste & Password Reveal Toggle -->
+              <div class="absolute right-2 flex items-center space-x-1">
+                <button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" id="btn-paste-key" title="Pegar del portapapeles" type="button">
+                  <span class="material-symbols-outlined text-[16px]">content_paste</span>
+                </button>
+                <button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" id="btn-toggle-key-visibility" title="Mostrar/ocultar clave" type="button">
+                  <span class="material-symbols-outlined text-[16px]" id="icon-eye-show">visibility</span>
+                  <span class="material-symbols-outlined text-[16px] hidden" id="icon-eye-hide">visibility_off</span>
+                </button>
+              </div>
+            </div>
+            <!-- Hash Fingerprint / Status Preview -->
+            <div class="mt-1.5 flex items-center justify-between font-mono text-[11px] text-outline">
+              <span class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                <span>Zero-Disk Security Shield</span>
+              </span>
+              <span>Dokploy VPS Ready</span>
+            </div>
+          </div>
 
-      <div class="lock-footer-badge">
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-        </svg>
-        Zero-Disk Direct Streaming Security
+          <button class="w-full h-11 rounded-lg bg-gradient-to-r from-primary-container to-surface-tint font-bold text-on-primary-fixed shadow-lg flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.99] transition-all" id="btn-unlock" type="submit">
+            <span class="material-symbols-outlined text-[18px]">key</span>
+            <span>Desbloquear Panel</span>
+          </button>
+        </form>
+
+        <div class="mt-6 pt-4 border-t border-outline-variant flex items-center justify-between font-mono text-[11px] text-outline">
+          <span class="flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">shield</span>
+            <span>Hardware Token Ready</span>
+          </span>
+          <span>v2.4 Production</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="brand">
-      <div class="brand-icon">
-        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3V7M4 7c0-2 1.5-3 3.5-3h9c2 0 3.5 1 3.5 3M4 7h16m-8 4v6m-3-3l3 3 3-3"/>
-        </svg>
+  <!-- TopNavBar (Stitch Header Component) -->
+  <header class="bg-surface-container-low border-b border-outline-variant sticky top-0 z-40 w-full shadow-sm">
+    <div class="flex items-center justify-between w-full px-6 h-16 max-w-[1600px] mx-auto">
+      <!-- Left: Logo & Search -->
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center border border-outline-variant shadow-sm text-primary">
+            <span class="material-symbols-outlined text-[22px]">database</span>
+          </div>
+          <div>
+            <span class="font-headline-sm text-base font-bold text-primary tracking-tight block">StreamVault DB</span>
+            <span class="font-mono text-[10px] text-outline block leading-none">Zero-Disk Streaming</span>
+          </div>
+        </div>
+        <div class="relative w-64 hidden lg:block">
+          <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+          <input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-9 pr-3 py-1.5 font-mono text-xs text-on-surface placeholder:text-outline focus:outline-none focus:border-primary" id="table-search-input" placeholder="Buscar respaldos o bases..." type="text"/>
+        </div>
       </div>
-      <div>
-        <div class="brand-title">StreamVault DB</div>
-        <div class="brand-tagline">Zero-Disk Direct Streaming to Google Drive • VPS & Dokploy Ready</div>
-      </div>
-    </div>
 
-    <div class="header-badges">
-      <div class="badge badge-stream" id="badge-stream-mode">
-        <span class="pulse-dot"></span> Zero-Disk Streaming
+      <!-- Center: Navigation Links -->
+      <nav class="hidden md:flex items-center gap-8">
+        <button class="nav-tab-link active text-primary border-b-2 border-primary font-semibold pb-1 text-xs transition-colors duration-150" data-tab="tab-backups">
+          Historial & Streaming
+        </button>
+        <button class="nav-tab-link text-on-surface-variant hover:text-on-surface pb-1 text-xs transition-colors duration-150" data-tab="tab-databases">
+          Bases de Datos
+        </button>
+        <button class="nav-tab-link text-on-surface-variant hover:text-on-surface pb-1 text-xs transition-colors duration-150" data-tab="tab-gdrive">
+          Google Drive
+        </button>
+        <button class="nav-tab-link text-on-surface-variant hover:text-on-surface pb-1 text-xs transition-colors duration-150" data-tab="tab-integrity">
+          Verificación & Integridad
+        </button>
+        <button class="nav-tab-link text-on-surface-variant hover:text-on-surface pb-1 text-xs transition-colors duration-150" data-tab="tab-dokploy">
+          Dokploy / VPS
+        </button>
+      </nav>
+
+      <!-- Right: Trailing Actions -->
+      <div class="flex items-center gap-3">
+        <!-- Live GDrive Sync Badge -->
+        <div class="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container border border-outline-variant font-mono text-xs text-on-surface-variant" id="badge-drive-status">
+          <span class="w-2 h-2 rounded-full bg-secondary animate-pulse-dot"></span>
+          <span>Google Drive</span>
+        </div>
+
+        <button class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-container text-on-primary-fixed font-semibold text-xs shadow hover:bg-surface-tint active:scale-[0.98] transition-transform duration-100 ease-out" id="btn-quick-backup" type="button">
+          <span class="material-symbols-outlined text-[16px]">bolt</span>
+          <span>Ejecutar Copia</span>
+        </button>
+
+        <div class="h-5 w-[1px] bg-outline-variant mx-1"></div>
+
+        <div class="flex items-center gap-1 text-on-surface-variant">
+          <button class="p-1.5 rounded-lg hover:bg-surface-container-high hover:text-on-surface transition-colors" id="btn-refresh" title="Actualizar datos">
+            <span class="material-symbols-outlined text-[19px]">sync</span>
+          </button>
+          <button class="p-1.5 rounded-lg hover:bg-surface-container-high hover:text-on-surface transition-colors" id="btn-lock-session" title="Bloquear sesión" style="display: none;">
+            <span class="material-symbols-outlined text-[19px]">lock</span>
+          </button>
+        </div>
+
+        <div class="w-8 h-8 rounded-full border border-outline-variant bg-surface-container-high flex items-center justify-center font-mono text-xs text-primary font-bold ml-1">
+          DB
+        </div>
       </div>
-      <div class="badge badge-success" id="badge-drive-status">
-        <span class="pulse-dot"></span> Google Drive Conectado
-      </div>
-      <button class="btn btn-secondary btn-sm" id="btn-refresh" title="Actualizar datos">
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-        </svg>
-        Actualizar
-      </button>
-      <button class="btn btn-secondary btn-sm" id="btn-lock-session" title="Bloquear panel" style="display: none;">
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-        </svg>
-        Bloquear
-      </button>
     </div>
   </header>
 
-  <main class="container">
-    <!-- Top Stats Cards -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Copias de Seguridad</span>
-          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
-          </svg>
-        </div>
-        <div class="stat-value" id="stat-total-backups">0</div>
-        <div class="stat-subtext" id="stat-success-rate">Tasa de éxito: 100%</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Transferido a Google Drive</span>
-          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-          </svg>
-        </div>
-        <div class="stat-value" id="stat-total-bytes">0 MB</div>
-        <div class="stat-subtext">Direct Stream (0 MB ocupados en VPS)</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Próxima Ejecución (Cron)</span>
-          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        </div>
-        <div class="stat-value" id="stat-cron-schedule" style="font-size: 1.35rem;">0 2 * * *</div>
-        <div class="stat-subtext" id="stat-next-run">Automático diario a las 02:00 AM</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-header">
-          <span>Verificación de Integridad</span>
-          <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
-        </div>
-        <div class="stat-value" id="stat-test-pass-rate">100%</div>
-        <div class="stat-subtext" id="stat-test-count">0 pruebas ejecutadas</div>
-      </div>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <nav class="tabs-nav">
-      <button class="tab-btn active" data-tab="tab-backups">
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-        </svg>
-        Historial de Copias
-      </button>
-      <button class="tab-btn" data-tab="tab-databases">
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
-        </svg>
-        Bases de Datos
-      </button>
-      <button class="tab-btn" data-tab="tab-gdrive">
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z"/>
-        </svg>
-        Google Drive
-      </button>
-      <button class="tab-btn" data-tab="tab-integrity">
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        Pruebas de Restauración & Integridad
-      </button>
-      <button class="tab-btn" data-tab="tab-dokploy">
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
-        </svg>
-        Despliegue Dokploy / VPS
-      </button>
-    </nav>
-
-    <!-- Tab 1: Historial de Copias -->
-    <section id="tab-backups" class="tab-content active">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">Copias de Seguridad en Google Drive</h2>
-            <p class="card-desc">Transmisiones en tiempo real sin almacenamiento temporal en el disco del VPS.</p>
+  <!-- App Body Layout (Stitch SideNavBar + Canvas) -->
+  <div class="flex flex-1 w-full max-w-[1600px] mx-auto min-h-[calc(100vh-4rem)]">
+    <!-- SideNavBar (Stitch Component) -->
+    <aside class="w-60 border-r border-outline-variant bg-surface-container-lowest shrink-0 hidden md:block">
+      <div class="flex flex-col justify-between h-full p-4 shrink-0">
+        <div class="space-y-6">
+          <!-- Cluster Header -->
+          <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary text-[20px]">cloud_sync</span>
+              <span class="text-sm font-bold text-on-surface truncate">Dokploy VPS Cluster</span>
+            </div>
+            <p class="font-mono text-[11px] text-on-surface-variant mt-1">Direct Stream Engine v2.4</p>
           </div>
-          <div style="display: flex; gap: 0.5rem;">
-            <select id="select-db-manual" class="form-select" style="min-width: 180px;">
-              <option value="">Seleccionar BD...</option>
-            </select>
-            <button class="btn btn-primary" id="btn-trigger-backup">
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              Ejecutar Copia Ahora
+
+          <!-- Main Nav Tabs -->
+          <nav class="space-y-1">
+            <button class="w-full tab-btn active flex items-center gap-3 bg-surface-container text-primary font-semibold rounded-lg px-3 py-2 border-l-2 border-primary text-xs text-left" data-tab="tab-backups">
+              <span class="material-symbols-outlined text-[20px]">dashboard</span>
+              <span>Historial & Streaming</span>
+            </button>
+            <button class="w-full tab-btn flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg px-3 py-2 text-xs text-left transition-colors" data-tab="tab-databases">
+              <span class="material-symbols-outlined text-[20px]">database</span>
+              <span>Bases de Datos</span>
+            </button>
+            <button class="w-full tab-btn flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg px-3 py-2 text-xs text-left transition-colors" data-tab="tab-gdrive">
+              <span class="material-symbols-outlined text-[20px]">cloud_upload</span>
+              <span>Google Drive</span>
+            </button>
+            <button class="w-full tab-btn flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg px-3 py-2 text-xs text-left transition-colors" data-tab="tab-integrity">
+              <span class="material-symbols-outlined text-[20px]">verified</span>
+              <span>Auditoría & Integridad</span>
+            </button>
+            <button class="w-full tab-btn flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg px-3 py-2 text-xs text-left transition-colors" data-tab="tab-dokploy">
+              <span class="material-symbols-outlined text-[20px]">rocket_launch</span>
+              <span>Dokploy / VPS</span>
+            </button>
+          </nav>
+
+          <!-- Side CTA -->
+          <div class="pt-2">
+            <button class="w-full flex items-center justify-center gap-2 py-2 px-3 border border-outline-variant bg-surface-container-high hover:bg-surface-container text-on-surface text-xs font-semibold rounded-lg active:scale-[0.98] transition-transform" id="btn-open-add-db" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span>Agregar Base de Datos</span>
             </button>
           </div>
         </div>
 
-        <div class="table-container">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Base de Datos</th>
-                <th>Archivo</th>
-                <th>Tamaño</th>
-                <th>Duración</th>
-                <th>Estado</th>
-                <th>Checksum SHA-256</th>
-                <th>Fecha</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="table-backups-body">
-              <tr>
-                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                  Cargando historial de copias...
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Rail Footer Tabs -->
+        <div class="border-t border-outline-variant pt-4 space-y-1">
+          <button class="w-full flex items-center gap-3 text-on-surface-variant hover:text-on-surface rounded-lg px-3 py-2 text-xs text-left" onclick="document.querySelector('[data-tab=\'tab-dokploy\']').click()">
+            <span class="material-symbols-outlined text-[18px]">menu_book</span>
+            <span>Documentación</span>
+          </button>
+          <div class="px-3 py-1 font-mono text-[10px] text-outline">
+            Puerto: <span id="span-port-display">5959</span>
+          </div>
         </div>
       </div>
-    </section>
+    </aside>
 
-    <!-- Tab 2: Configuración de Bases de Datos -->
-    <section id="tab-databases" class="tab-content">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">Bases de Datos a Copiar</h2>
-            <p class="card-desc">Configura conexiones de PostgreSQL y MySQL/MariaDB para respaldos automáticos.</p>
+    <!-- Main Content Canvas -->
+    <main class="flex-1 min-w-0 p-6 space-y-6">
+      <!-- Breadcrumbs & Status Sub-header -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-outline-variant">
+        <div>
+          <div class="flex items-center gap-2 text-on-surface-variant font-mono text-xs">
+            <span>clusters</span>
+            <span>/</span>
+            <span>dokploy-vps</span>
+            <span>/</span>
+            <span class="text-primary font-medium">direct-gdrive-pipe</span>
           </div>
-          <button class="btn btn-primary" id="btn-open-add-db">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            Agregar Base de Datos
-          </button>
+          <div class="flex items-center gap-3 mt-1">
+            <h1 class="text-xl font-bold text-on-surface">Direct Stream Engine</h1>
+            <span class="h-5 px-2 rounded-full font-mono text-[10px] bg-surface-container-high border border-outline-variant text-primary inline-flex items-center">
+              Dokploy Production
+            </span>
+          </div>
         </div>
 
-        <div class="table-container">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Motor</th>
-                <th>Host & Puerto</th>
-                <th>Base de Datos</th>
-                <th>Usuario</th>
-                <th>SSL</th>
-                <th>Última Prueba</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="table-dbs-body">
-              <tr>
-                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                  Cargando bases de datos configuradas...
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Realtime WebSocket Status & Auxiliary CTA -->
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low border border-outline-variant">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+            </span>
+            <span class="font-mono text-xs text-secondary font-medium">Direct Stream Engine Active</span>
+            <span class="font-mono text-[11px] text-outline">(zero-disk buffer)</span>
+          </div>
         </div>
       </div>
-    </section>
 
-    <!-- Tab 3: Configuración de Google Drive -->
-    <section id="tab-gdrive" class="tab-content">
-      <div class="card">
-        <div class="card-header">
+      <!-- Direct Stream Pipeline Visualizer Component (Stitch Hero Visual) -->
+      <section class="p-4 rounded-xl bg-surface-container-low border border-outline-variant">
+        <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-surface-container-highest border border-outline-variant text-primary">
+              <span class="material-symbols-outlined text-[24px]">database</span>
+            </div>
+            <div>
+              <span class="text-[11px] text-outline uppercase tracking-wider block font-semibold">Origen de Datos</span>
+              <span class="font-mono text-xs text-on-surface font-semibold">PostgreSQL 17 & MySQL 8+</span>
+            </div>
+          </div>
+
+          <!-- Animated Conduit -->
+          <div class="flex-1 w-full lg:max-w-md px-4 flex flex-col items-center">
+            <div class="flex items-center justify-between w-full font-mono text-[11px] text-on-surface-variant mb-1">
+              <span class="flex items-center gap-1 text-primary">
+                <span class="material-symbols-outlined text-[14px]">speed</span>
+                Streaming En Vivo
+              </span>
+              <span class="text-secondary font-medium">Gzip On-the-Fly</span>
+              <span class="text-outline">Buffer RAM: 0 MB en Disco</span>
+            </div>
+            <svg class="w-full h-4" fill="none" viewbox="0 0 400 16">
+              <line stroke="#3e484f" stroke-width="2" x1="0" x2="400" y1="8" y2="8"></line>
+              <line class="stream-flow-line" stroke="#38bdf8" stroke-width="2" x1="0" x2="400" y1="8" y2="8"></line>
+            </svg>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div class="text-right">
+              <span class="text-[11px] text-outline uppercase tracking-wider block font-semibold">Destino en la Nube</span>
+              <span class="font-mono text-xs text-primary font-semibold">Google Drive API v3 (Direct Stream)</span>
+            </div>
+            <div class="p-2 rounded-lg bg-surface-container-highest border border-outline-variant text-secondary">
+              <span class="material-symbols-outlined text-[24px]">cloud_upload</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Key Stats Cards (Bento 4-Column Grid) -->
+      <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <!-- Card 1: Total Backups -->
+        <div class="p-5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
           <div>
-            <h2 class="card-title">Configuración de Google Drive</h2>
-            <p class="card-desc">Credenciales para la subida por streaming directo hacia la nube.</p>
-          </div>
-          <button class="btn btn-secondary" id="btn-test-gdrive">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Probar Conexión con Drive
-          </button>
-        </div>
-
-        <!-- Info Banner sobre Cuota de Google Drive -->
-        <div style="background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
-          <h4 style="color: var(--accent); margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem;">
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            ¿Qué método de autenticación debes elegir?
-          </h4>
-          <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 0.85rem; border-radius: 6px; border-left: 3px solid #10b981;">
-              <strong style="color: #10b981; display: block; margin-bottom: 0.25rem;">Opción 1: OAuth 2.0 (Cuentas @gmail.com)</strong>
-              <p style="margin: 0;">
-                Si usas una cuenta de Gmail personal, <strong>este es el método requerido</strong>. Las copias se suben directamente a tu almacenamiento personal (15 GB gratuitos o Google One). Solo requiere Client ID y Secret.
-              </p>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-on-surface-variant uppercase">Copias de Seguridad</span>
+              <span class="p-1 rounded bg-surface-container text-primary">
+                <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+              </span>
             </div>
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 0.85rem; border-radius: 6px; border-left: 3px solid #38bdf8;">
-              <strong style="color: #38bdf8; display: block; margin-bottom: 0.25rem;">Opción 2: Cuenta de Servicio (Google Workspace)</strong>
-              <p style="margin: 0;">
-                Google asigna <strong>0 GB</strong> de cuota a las Cuentas de Servicio. Para usarlas sin error de cuota, la carpeta debe estar dentro de una <strong>Unidad Compartida (Shared Drive)</strong> de Workspace.
-              </p>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-bold text-on-surface" id="stat-total-backups">0</span>
+              <span class="font-mono text-xs text-secondary font-medium" id="stat-success-rate">100% éxito</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-outline-variant/60 flex items-center justify-between font-mono text-[11px]">
+            <span class="text-outline">Cero disco VPS</span>
+            <div class="flex items-center gap-1 text-secondary">
+              <span class="material-symbols-outlined text-[14px]">check_circle</span>
+              <span>Sincronizado</span>
             </div>
           </div>
         </div>
 
-        <form id="form-gdrive">
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Método de Autenticación</label>
-              <select id="gdrive-auth-type" class="form-select">
-                <option value="oauth">OAuth 2.0 (Recomendado para cuentas @gmail.com personales)</option>
-                <option value="service_account">Cuenta de Servicio JSON (Solo para Unidades Compartidas / Workspace)</option>
-              </select>
+        <!-- Card 2: Google Drive Storage -->
+        <div class="p-5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-on-surface-variant uppercase">Transferido a Drive</span>
+              <span class="p-1 rounded bg-surface-container text-primary-container">
+                <span class="material-symbols-outlined text-[18px]">cloud</span>
+              </span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-bold text-on-surface" id="stat-total-bytes">0 B</span>
+              <span class="font-mono text-xs text-outline">/ Cuota Drive</span>
+            </div>
+            <div class="w-full bg-surface-container-highest h-2 rounded-full mt-3 overflow-hidden flex">
+              <div class="bg-primary-container h-full" style="width: 25%"></div>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-outline-variant/60 flex items-center justify-between font-mono text-[11px] text-outline">
+            <span class="truncate">Streaming continuo</span>
+            <span class="text-secondary font-medium">Activo</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Next Scheduled Run -->
+        <div class="p-5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-on-surface-variant uppercase">Cron Job Programado</span>
+              <span class="p-1 rounded bg-surface-container text-primary">
+                <span class="material-symbols-outlined text-[18px]">schedule</span>
+              </span>
+            </div>
+            <div class="mt-2">
+              <span class="font-mono text-lg font-bold text-primary" id="stat-cron-schedule">0 2 * * *</span>
+            </div>
+            <div class="mt-2 inline-flex items-center gap-1 font-mono text-[11px] text-on-surface-variant px-2 py-0.5 rounded bg-surface-container">
+              <span>Diario a las 02:00 AM</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-outline-variant/60 flex items-center justify-between font-mono text-[11px] text-outline">
+            <span>Zona Horaria</span>
+            <span class="text-primary font-medium">America/Bogota</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Integrity Test Pass Rate -->
+        <div class="p-5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-on-surface-variant uppercase">Tasa de Integridad</span>
+              <span class="p-1 rounded bg-surface-container text-secondary">
+                <span class="material-symbols-outlined text-[18px]">verified_user</span>
+              </span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-bold text-secondary" id="stat-test-pass-rate">100%</span>
+              <span class="h-5 px-2 rounded-full font-mono text-[10px] bg-secondary/10 border border-secondary/30 text-secondary inline-flex items-center" id="stat-test-count">
+                0 pruebas
+              </span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-outline-variant/60 flex items-center justify-between font-mono text-[11px]">
+            <span class="text-outline">CRC & Tablas SQL</span>
+            <span class="text-secondary font-medium">SHA-256 Validado</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 1: HISTORIAL DE COPIAS & STREAMING -->
+      <section class="tab-content active space-y-6" id="tab-backups">
+        <!-- Manual Backup Trigger Bar -->
+        <div class="p-4 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col md:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary text-[22px]">play_circle</span>
+            <div>
+              <h3 class="font-bold text-sm text-on-surface">Ejecución Manual de Backup</h3>
+              <p class="text-xs text-on-surface-variant">Transmite inmediatamente el volcado de la base de datos a Google Drive.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 w-full md:w-auto">
+            <select class="bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 font-mono text-xs text-on-surface focus:outline-none focus:border-primary min-w-[200px]" id="select-db-manual">
+              <option value="">Seleccionar Base de Datos...</option>
+            </select>
+            <button class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-container text-on-primary-fixed font-bold text-xs shadow hover:bg-surface-tint active:scale-[0.98] transition-transform shrink-0" id="btn-trigger-backup" type="button">
+              <span class="material-symbols-outlined text-[16px]">bolt</span>
+              <span>Iniciar Transmisión</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Backups History Table -->
+        <div class="rounded-xl bg-surface-container-low border border-outline-variant overflow-hidden">
+          <div class="p-4 border-b border-outline-variant flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <h3 class="font-bold text-sm text-on-surface">Registro de Respaldos en Google Drive</h3>
+              <span class="font-mono text-[11px] text-outline px-2 py-0.5 rounded bg-surface-container">Live Sync</span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left font-sans text-xs">
+              <thead class="bg-surface-container-lowest text-on-surface-variant font-semibold uppercase tracking-wider border-b border-outline-variant">
+                <tr>
+                  <th class="py-3 px-4">Base de Datos</th>
+                  <th class="py-3 px-4">Archivo</th>
+                  <th class="py-3 px-4">Tamaño</th>
+                  <th class="py-3 px-4">Duración</th>
+                  <th class="py-3 px-4">Estado Streaming</th>
+                  <th class="py-3 px-4">Checksum SHA-256</th>
+                  <th class="py-3 px-4">Fecha</th>
+                  <th class="py-3 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-outline-variant/60 font-mono text-xs" id="table-backups-body">
+                <tr>
+                  <td class="text-center text-outline py-8" colspan="8">
+                    Cargando historial de copias...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: CONFIGURACIÓN DE BASES DE DATOS -->
+      <section class="tab-content space-y-6" id="tab-databases">
+        <div class="rounded-xl bg-surface-container-low border border-outline-variant p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-outline-variant pb-4 mb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[20px]">database</span>
+                <h2 class="font-bold text-base text-on-surface">Bases de Datos Configuradas</h2>
+              </div>
+              <p class="text-xs text-on-surface-variant mt-1">Conexiones PostgreSQL 17 y MySQL para respaldos automáticos programados.</p>
+            </div>
+            <button class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-container text-on-primary-fixed font-semibold text-xs shadow hover:bg-surface-tint" id="btn-open-add-db-2" type="button">
+              <span class="material-symbols-outlined text-[16px]">add</span>
+              <span>Nueva Conexión</span>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left font-sans text-xs">
+              <thead class="bg-surface-container-lowest text-on-surface-variant font-semibold uppercase tracking-wider border-b border-outline-variant">
+                <tr>
+                  <th class="py-3 px-4">Nombre</th>
+                  <th class="py-3 px-4">Motor</th>
+                  <th class="py-3 px-4">Host : Puerto</th>
+                  <th class="py-3 px-4">Base de Datos</th>
+                  <th class="py-3 px-4">Usuario</th>
+                  <th class="py-3 px-4">SSL</th>
+                  <th class="py-3 px-4">Última Prueba</th>
+                  <th class="py-3 px-4">Estado</th>
+                  <th class="py-3 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-outline-variant/60 font-mono text-xs" id="table-dbs-body">
+                <tr>
+                  <td class="text-center text-outline py-8" colspan="9">
+                    Cargando conexiones...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: CONFIGURACIÓN DE GOOGLE DRIVE -->
+      <section class="tab-content space-y-6" id="tab-gdrive">
+        <div class="rounded-xl bg-surface-container-low border border-outline-variant p-6 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-outline-variant pb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-secondary text-[22px]">cloud_upload</span>
+                <h2 class="font-bold text-base text-on-surface">Configuración de Google Drive</h2>
+              </div>
+              <p class="text-xs text-on-surface-variant mt-1">Streaming directo al API de Drive sin almacenar archivos temporales en el VPS.</p>
+            </div>
+            <button class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-surface-container-high border border-outline-variant text-on-surface font-semibold text-xs hover:bg-surface-variant active:scale-[0.98]" id="btn-test-gdrive" type="button">
+              <span class="material-symbols-outlined text-[16px]">cloud_sync</span>
+              <span>Probar Conexión con Drive</span>
+            </button>
+          </div>
+
+          <!-- Quota Guidance Banner -->
+          <div class="p-4 rounded-xl bg-surface-container border border-outline-variant/80">
+            <h4 class="text-xs font-semibold text-primary uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]">info</span>
+              ¿Qué método de autenticación debes elegir?
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div class="p-3 rounded-lg bg-surface-container-lowest border-l-2 border-secondary">
+                <span class="font-bold text-secondary block mb-1">Opción 1: OAuth 2.0 (Cuentas personales @gmail.com)</span>
+                <p class="text-on-surface-variant text-[11px] leading-relaxed">
+                  Google asigna 0 GB de cuota a Service Accounts en cuentas personales. Con <strong>OAuth 2.0</strong>, los respaldos se suben usando tu propia cuenta y usan tus 15 GB de Google Drive.
+                </p>
+              </div>
+              <div class="p-3 rounded-lg bg-surface-container-lowest border-l-2 border-primary">
+                <span class="font-bold text-primary block mb-1">Opción 2: Cuenta de Servicio (Google Workspace)</span>
+                <p class="text-on-surface-variant text-[11px] leading-relaxed">
+                  Para usar Cuentas de Servicio sin error de cuota, la carpeta debe pertenecer a una <strong>Unidad Compartida (Shared Drive)</strong> de Workspace con la Service Account como Gestor de contenido.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <form id="form-gdrive" class="space-y-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-on-surface-variant mb-1">Método de Autenticación</label>
+                <select class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-xs font-mono text-on-surface focus:outline-none focus:border-primary" id="gdrive-auth-type">
+                  <option value="oauth" selected>OAuth 2.0 Web Flow (Recomendado para @gmail.com)</option>
+                  <option value="service_account">Cuenta de Servicio JSON (Unidades Compartidas / Workspace)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-on-surface-variant mb-1">ID de Carpeta en Google Drive</label>
+                <div class="relative">
+                  <input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-3 pr-16 py-2 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="gdrive-folder-id" placeholder="ID de la carpeta o 'root'" type="text" value="root"/>
+                  <span class="absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-outline bg-surface-container px-1.5 py-0.5 rounded">Folder</span>
+                </div>
+                <span class="font-mono text-[10px] text-outline mt-1 block">El ID al final de la URL en drive.google.com/drive/folders/<strong>ID</strong> (o escribe 'root')</span>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">ID de Carpeta en Google Drive</label>
-              <input type="text" id="gdrive-folder-id" class="form-input" placeholder="Ej: 1A2b3C4d5E6f7G8h9I0jK... (o escribe 'root')">
-              <span class="stat-subtext">El ID que aparece al final de la URL en drive.google.com/drive/folders/<strong>ID</strong> (o 'root' para la raíz)</span>
-            </div>
+            <!-- OAuth 2.0 Section -->
+            <div class="p-4 rounded-xl bg-surface-container-lowest border border-outline-variant space-y-4" id="section-oauth">
+              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-outline-variant/60 pb-3">
+                <div>
+                  <h4 class="text-xs font-bold text-on-surface">Conectar con Google OAuth 2.0 (1 Clic)</h4>
+                  <p class="text-[11px] text-on-surface-variant">Genera automáticamente el Refresh Token vinculando tu cuenta de Google.</p>
+                </div>
+                <button class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow active:scale-[0.98] transition-transform" id="btn-oauth-connect" type="button">
+                  <span class="material-symbols-outlined text-[16px]">link</span>
+                  <span>Conectar con Google (1 Clic)</span>
+                </button>
+              </div>
 
-            <!-- OAuth section -->
-            <div class="form-group full-width" id="section-oauth">
-              <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
-                  <div>
-                    <h4 style="color: var(--text-primary); margin: 0; font-size: 0.95rem;">Conectar con Google OAuth 2.0</h4>
-                    <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.25rem 0 0 0;">
-                      Ingresa tu Client ID y Secret de Google Cloud y haz clic en Conectar para autorizar en 1 clic.
-                    </p>
-                  </div>
-                  <button type="button" class="btn btn-primary" id="btn-oauth-connect" style="background: #2563eb; border-color: #3b82f6;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                    </svg>
-                    Conectar con Google (1 Clic)
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs text-on-surface-variant mb-1">Client ID</label>
+                  <input class="w-full bg-surface-container-low border border-outline-variant rounded px-3 py-2 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="gdrive-client-id" placeholder="123456-xxxx.apps.googleusercontent.com" type="text"/>
+                </div>
+                <div>
+                  <label class="block text-xs text-on-surface-variant mb-1">Client Secret</label>
+                  <input class="w-full bg-surface-container-low border border-outline-variant rounded px-3 py-2 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="gdrive-client-secret" placeholder="GOCSPX-xxxxxxxxxxxxxx" type="password"/>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs text-on-surface-variant mb-1">URI de Redirección Autorizada para Google Cloud Console</label>
+                <div class="flex gap-2">
+                  <input class="w-full bg-surface-container-low border border-outline-variant rounded px-3 py-2 font-mono text-[11px] text-primary" id="oauth-redirect-uri" readonly type="text"/>
+                  <button class="px-3 py-2 rounded bg-surface-container-high border border-outline-variant hover:bg-surface-variant text-xs font-semibold shrink-0" id="btn-copy-redirect-uri" type="button">
+                    Copiar URI
                   </button>
                 </div>
+                <span class="font-mono text-[10px] text-outline mt-1 block">Pega esta URI en Google Cloud > Credenciales > Tu ID de cliente OAuth > <strong>URIs de redireccionamiento autorizados</strong>.</span>
+              </div>
 
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label class="form-label">Client ID</label>
-                    <input type="text" id="gdrive-client-id" class="form-input" placeholder="ej: 123456789-xxx.apps.googleusercontent.com">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Client Secret</label>
-                    <input type="password" id="gdrive-client-secret" class="form-input" placeholder="ej: GOCSPX-xxxxxxxxxxxxxx">
-                  </div>
-                  <div class="form-group full-width">
-                    <label class="form-label">URI de Redirección Autorizada para Google Cloud Console</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                      <input type="text" id="oauth-redirect-uri" class="form-input" readonly style="background: rgba(15, 23, 42, 0.9); font-family: monospace; font-size: 0.8rem; color: var(--accent);">
-                      <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-redirect-uri" style="white-space: nowrap;">
-                        Copiar URI
-                      </button>
-                    </div>
-                    <span class="stat-subtext">Copia y pega esta URL en Google Cloud Console > APIs y servicios > Credenciales > Tu ID de cliente OAuth > <strong>URIs de redireccionamiento autorizados</strong>.</span>
-                  </div>
-                  <div class="form-group full-width">
-                    <label class="form-label">Refresh Token</label>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                      <input type="password" id="gdrive-refresh-token" class="form-input" placeholder="Se completará automáticamente al Conectar con Google (o pega uno manualmente)">
-                      <span id="oauth-token-status" class="badge badge-secondary" style="white-space: nowrap; padding: 0.45rem 0.75rem;">Sin Token</span>
-                    </div>
-                  </div>
+              <div>
+                <label class="block text-xs text-on-surface-variant mb-1">Refresh Token</label>
+                <div class="flex items-center gap-2">
+                  <input class="w-full bg-surface-container-low border border-outline-variant rounded px-3 py-2 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="gdrive-refresh-token" placeholder="Se genera al conectar con Google (o pega manualmente)" type="password"/>
+                  <span class="h-6 px-2.5 rounded-full font-mono text-[10px] bg-surface-container-high border border-outline-variant text-outline shrink-0 inline-flex items-center" id="oauth-token-status">
+                    Sin Token
+                  </span>
                 </div>
               </div>
             </div>
 
-            <!-- Service Account section -->
-            <div class="form-group full-width" id="section-sa-json" style="display: none;">
-              <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 0.85rem 1rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: #fca5a5;">
-                ⚠️ <strong>Aviso importante:</strong> Para usar Cuenta de Servicio, la carpeta <strong>DEBE pertenecer a una "Unidad Compartida" (Shared Drive) de Google Workspace</strong> y debes invitar a tu <code>client_email</code> como <strong>Gestor de contenido</strong>. En cuentas personales @gmail.com Google bloquea la subida con error de cuota cero.
+            <!-- Service Account Section -->
+            <div class="p-4 rounded-xl bg-surface-container-lowest border border-outline-variant space-y-3 hidden" id="section-sa-json">
+              <div class="text-[11px] text-error bg-error-container/20 border border-error/30 p-2.5 rounded-lg">
+                ⚠️ Para cuentas de servicio, la carpeta DEBE estar en una <strong>Unidad Compartida (Shared Drive)</strong> con la Service Account como Gestor de contenido.
               </div>
-              <label class="form-label">Service Account JSON (Contenido de la llave .json)</label>
-              <textarea id="gdrive-sa-json" class="form-textarea" placeholder='{"type": "service_account", "project_id": "...", "private_key": "...", "client_email": "..."}'></textarea>
+              <label class="block text-xs font-semibold text-on-surface-variant">Service Account JSON</label>
+              <textarea class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-3 font-mono text-xs text-on-surface focus:outline-none focus:border-primary h-32" id="gdrive-sa-json" placeholder='{"type": "service_account", "project_id": "...", "private_key": "...", "client_email": "..."}'></textarea>
             </div>
-          </div>
 
-          <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
-            <button type="submit" class="btn btn-primary">
-              Guardar Credenciales de Drive
-            </button>
-          </div>
-        </form>
+            <!-- Zero Disk Cache Explainer Callout (Stitch Callout) -->
+            <div class="p-3.5 rounded-lg bg-surface-container-highest/40 border border-outline-variant flex items-center gap-3">
+              <span class="material-symbols-outlined text-primary text-[24px] shrink-0">memory</span>
+              <p class="text-xs text-on-surface-variant leading-relaxed">
+                <strong class="text-on-surface">Direct Streaming Activado:</strong> Cero escritura en disco. El comando <code>pg_dump</code> / <code>mysqldump</code> se canaliza en memoria hacia <code>gzip</code> y fragmentos HTTP del API de Drive en tiempo real.
+              </p>
+            </div>
 
-        <div class="dokploy-callout" style="margin-top: 1.5rem;">
-          <h4>
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            ¿Cómo funciona el streaming directo a Google Drive?
-          </h4>
-          <p>
-            Al ejecutarse la copia, el comando <code>pg_dump</code> o <code>mysqldump</code> escribe en la salida estándar (stdout), pasando inmediatamente por un compresor <code>gzip</code> en memoria y transmitiéndose por fragmentos HTTP directo al API de Google Drive. En ningún momento se guarda el archivo en el disco duro del VPS, evitando que se agote el espacio de almacenamiento.
-          </p>
+            <div class="flex justify-end pt-2">
+              <button class="px-5 py-2.5 rounded-lg bg-primary-container text-on-primary-fixed font-bold text-xs shadow hover:bg-surface-tint active:scale-[0.98]" type="submit">
+                Guardar Credenciales de Drive
+              </button>
+            </div>
+          </form>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Tab 4: Pruebas de Restauración & Integridad -->
-    <section id="tab-integrity" class="tab-content">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">Auditoría y Pruebas de Restauración</h2>
-            <p class="card-desc">Verifica que las copias no estén corruptas y sean 100% restaurables.</p>
-          </div>
-          <div class="badge badge-stream">Auto-Verificación Activada</div>
-        </div>
-
-        <div class="table-container">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>ID Test</th>
-                <th>Archivo de Backup</th>
-                <th>Tipo de Prueba</th>
-                <th>Estado</th>
-                <th>Tablas Verificadas</th>
-                <th>Duración</th>
-                <th>Fecha</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="table-tests-body">
-              <tr>
-                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                  Cargando auditorías de restauración...
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tab 5: Dokploy & VPS -->
-    <section id="tab-dokploy" class="tab-content">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">Despliegue en VPS con Dokploy</h2>
-            <p class="card-desc">Instrucciones y configuración para subir este servicio directamente a tu servidor.</p>
-          </div>
-          <span class="badge badge-success">Dokploy Compatible</span>
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
-          <div class="dokploy-callout">
-            <h4>Paso 1: Configurar en Dokploy</h4>
-            <p>
-              1. En tu panel de <strong>Dokploy</strong>, crea un nuevo <strong>Proyecto</strong> y añade una <strong>Aplicación</strong>.<br>
-              2. Conecta tu repositorio de GitHub / Git o selecciona <strong>Dockerfile</strong>.<br>
-              3. Dokploy detectará automáticamente el archivo <code>Dockerfile</code> optimizado que incluye <code>postgresql-client</code>, <code>mysql-client</code> y <code>node:22-alpine</code>.<br>
-              4. En la casilla <strong>Port</strong> de la aplicación en Dokploy, coloca el mismo puerto definido en la variable <code>PORT</code> (por defecto <code>3000</code>, o cualquier puerto que desees como <code>8080</code>, <code>5000</code>, etc.).
-            </p>
+      <!-- TAB 4: PRUEBAS DE RESTAURACIÓN & INTEGRIDAD -->
+      <section class="tab-content space-y-6" id="tab-integrity">
+        <!-- Stitch Interactive Restore Dry-Run & Integrity Inspector -->
+        <div class="rounded-xl bg-surface-container-low border border-outline-variant p-6 space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-outline-variant pb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-secondary text-[22px]">verified</span>
+                <h2 class="font-bold text-base text-on-surface">Auditoría y Pruebas de Restauración Automáticas</h2>
+              </div>
+              <p class="text-xs text-on-surface-variant mt-1">Verificación automática post-backup: CRC stream, conteo de tablas DDL/DML y sandbox efímero.</p>
+            </div>
+            <span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-secondary/10 border border-secondary/30 text-secondary inline-flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+              Auto-Verificación Activada
+            </span>
           </div>
 
-          <div class="dokploy-callout">
-            <h4>Paso 2: Montar Volumen Persistente</h4>
-            <p>
-              Para que las configuraciones de bases de datos y el historial no se borren al reiniciar el contenedor, añade este volumen en Dokploy:<br>
-              • <strong>Host Path / Volume:</strong> <code>job_db_data</code><br>
-              • <strong>Mount Path:</strong> <code>/app/data</code>
-            </p>
-          </div>
+          <!-- Split Grid: Multi-Step Pipeline Tracker vs Dark Console Output -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Left 5-Columns: Multi-step Pipeline Tracker -->
+            <div class="lg:col-span-5 space-y-3">
+              <h4 class="font-mono text-[11px] uppercase tracking-wider text-outline">Pipeline de Verificación de Integridad</h4>
 
-          <div class="dokploy-callout">
-            <h4>Paso 3: Variables de Entorno (.env)</h4>
-            <p>Configura las variables en la pestaña <strong>Environment</strong> de Dokploy:</p>
-            <div class="terminal-box" style="margin-top: 0.5rem;">
-PORT=3000 # O el puerto que elijas para Dokploy (ej: 8080, 5000)
-BACKUP_CRON=0 2 * * *
-TIMEZONE=America/Bogota
-DASHBOARD_PASSWORD=tu_clave_secreta
+              <!-- Step 1 -->
+              <div class="p-3 rounded-lg bg-surface-container border border-outline-variant flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">check</span>
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold text-xs text-on-surface">Paso 1: Checksum SHA-256</span>
+                    <span class="font-mono text-[11px] text-secondary">Verificado</span>
+                  </div>
+                  <p class="font-mono text-[10px] text-outline mt-0.5">Validación de flujo Gzip CRC y hash SHA-256 en tiempo real.</p>
+                </div>
+              </div>
 
-# Opcional (si deseas precargar las credenciales sin usar la web):
-DEFAULT_DB_TYPE=postgres
-DEFAULT_DB_HOST=172.17.0.1
-DEFAULT_DB_PORT=5432
-DEFAULT_DB_NAME=mi_base_de_datos
-DEFAULT_DB_USER=postgres
-DEFAULT_DB_PASSWORD=mi_password
+              <!-- Step 2 -->
+              <div class="p-3 rounded-lg bg-surface-container border border-outline-variant flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">check</span>
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold text-xs text-on-surface">Paso 2: Conteo de Tablas SQL</span>
+                    <span class="font-mono text-[11px] text-secondary">Verificado</span>
+                  </div>
+                  <p class="font-mono text-[10px] text-outline mt-0.5">Parser de sentencias DDL/DML, inserts y consistencia de esquema.</p>
+                </div>
+              </div>
 
-GOOGLE_DRIVE_FOLDER_ID=1A2b3C4d5E...
-GOOGLE_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
+              <!-- Step 3 -->
+              <div class="p-3 rounded-lg bg-surface-container border border-outline-variant flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0 mt-0.5">
+                  <span class="material-symbols-outlined text-[16px]">verified</span>
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold text-xs text-on-surface">Paso 3: Sello Criptográfico</span>
+                    <span class="font-mono text-[11px] text-secondary">Certificado</span>
+                  </div>
+                  <p class="font-mono text-[10px] text-outline mt-0.5">Respaldo certificado listo para recuperación ante desastres sin pérdida.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right 7-Columns: Dark Monospaced Code/Terminal Log Viewer (Stitch Terminal) -->
+            <div class="lg:col-span-7 flex flex-col rounded-lg bg-surface-container-lowest border border-outline-variant overflow-hidden">
+              <div class="px-4 py-2.5 bg-surface-container-high border-b border-outline-variant flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                  <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                  <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                  <span class="ml-2 font-mono text-[11px] text-outline">streamvault-audit-console</span>
+                </div>
+                <button class="text-outline hover:text-on-surface font-mono text-[11px] flex items-center gap-1" id="btn-copy-live-logs">
+                  <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                  <span>Copiar</span>
+                </button>
+              </div>
+              <div class="p-4 font-mono text-xs text-on-surface-variant space-y-1.5 overflow-y-auto max-h-[220px]" id="live-audit-logs">
+                <p><span class="text-outline">[INIT]</span> StreamVault Integrity Auditor activo.</p>
+                <p><span class="text-outline">[GDRIVE]</span> Chunked stream pipe verificado con Google Drive API v3.</p>
+                <p><span class="text-secondary font-semibold">[READY]</span> Esperando próxima prueba de integridad programada...</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
-  </main>
 
-  <!-- Modal: Agregar / Editar Base de Datos -->
+        <!-- Restore Tests History Table -->
+        <div class="rounded-xl bg-surface-container-low border border-outline-variant overflow-hidden">
+          <div class="p-4 border-b border-outline-variant">
+            <h3 class="font-bold text-sm text-on-surface">Historial de Auditorías de Restauración</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left font-sans text-xs">
+              <thead class="bg-surface-container-lowest text-on-surface-variant font-semibold uppercase tracking-wider border-b border-outline-variant">
+                <tr>
+                  <th class="py-3 px-4">ID</th>
+                  <th class="py-3 px-4">Archivo de Backup</th>
+                  <th class="py-3 px-4">Tipo de Prueba</th>
+                  <th class="py-3 px-4">Estado</th>
+                  <th class="py-3 px-4">Tablas Verificadas</th>
+                  <th class="py-3 px-4">Duración</th>
+                  <th class="py-3 px-4">Fecha</th>
+                  <th class="py-3 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-outline-variant/60 font-mono text-xs" id="table-tests-body">
+                <tr>
+                  <td class="text-center text-outline py-8" colspan="8">
+                    No se han registrado auditorías aún.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: DESPLIEGUE DOKPLOY / VPS -->
+      <section class="tab-content space-y-6" id="tab-dokploy">
+        <div class="rounded-xl bg-surface-container-low border border-outline-variant p-6 space-y-4">
+          <div class="flex items-center justify-between border-b border-outline-variant pb-3">
+            <div>
+              <h2 class="font-bold text-base text-on-surface">Despliegue en VPS con Dokploy</h2>
+              <p class="text-xs text-on-surface-variant">Guía de configuración para correr el servicio con persistencia en Dokploy.</p>
+            </div>
+            <span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-secondary/10 border border-secondary/30 text-secondary inline-flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+              Dokploy Ready
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div class="p-4 rounded-lg bg-surface-container-lowest border border-outline-variant space-y-2">
+              <h3 class="font-bold text-primary flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px]">dns</span>
+                1. Configuración de la Aplicación en Dokploy
+              </h3>
+              <ul class="text-on-surface-variant space-y-1.5 leading-relaxed">
+                <li>• <strong>Repositorio Git:</strong> <code>https://github.com/duvanCode/StreamVault-DB.git</code></li>
+                <li>• <strong>Branch:</strong> <code>main</code></li>
+                <li>• <strong>Build Type:</strong> Dockerfile (incluye Node 22, PostgreSQL 17 client y MySQL client).</li>
+                <li>• <strong>Puerto:</strong> Configura el puerto que elijas en la variable <code>PORT</code> (ej: <code>5959</code>).</li>
+              </ul>
+            </div>
+
+            <div class="p-4 rounded-lg bg-surface-container-lowest border border-outline-variant space-y-2">
+              <h3 class="font-bold text-secondary flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px]">folder</span>
+                2. Volumen Persistente (Imprescindible)
+              </h3>
+              <p class="text-on-surface-variant leading-relaxed">
+                En Dokploy > Aplicación > <strong>Volumes</strong>, añade un volumen persistente para que no pierdas tus configuraciones al reiniciar el contenedor:
+              </p>
+              <div class="p-2.5 rounded bg-surface-container font-mono text-xs text-primary">
+                Destino en contenedor: <code>/app/data</code>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Database Add/Edit Modal (Stitch Glassmorphism) -->
   <div class="modal-overlay" id="modal-db">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 class="card-title" id="modal-db-title">Configurar Base de Datos</h3>
-        <button class="close-btn" id="btn-close-db-modal">&times;</button>
+    <div class="relative bg-surface-container-low border border-outline-variant rounded-xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-outline-variant pb-3">
+        <h3 class="font-bold text-base text-on-surface" id="modal-db-title">Agregar Base de Datos</h3>
+        <button class="text-on-surface-variant hover:text-on-surface" id="btn-close-db-modal" type="button">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
       </div>
-      <form id="form-db">
-        <div class="modal-body">
-          <input type="hidden" id="db-id">
-          <div class="form-grid">
-            <div class="form-group full-width">
-              <label class="form-label">Nombre Identificador</label>
-              <input type="text" id="db-name" class="form-input" placeholder="Ej: Base de Datos de Producción" required>
-            </div>
 
-            <div class="form-group">
-              <label class="form-label">Motor de Base de Datos</label>
-              <select id="db-type" class="form-select">
-                <option value="postgres">PostgreSQL</option>
-                <option value="mysql">MySQL / MariaDB</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Host / IP</label>
-              <input type="text" id="db-host" class="form-input" placeholder="localhost o 172.17.0.1" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Puerto</label>
-              <input type="number" id="db-port" class="form-input" value="5432" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Nombre de la Base de Datos</label>
-              <input type="text" id="db-database" class="form-input" placeholder="mi_bd" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Usuario</label>
-              <input type="text" id="db-user" class="form-input" placeholder="postgres" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Contraseña</label>
-              <input type="password" id="db-password" class="form-input" placeholder="••••••••">
-            </div>
-
-            <div class="form-group full-width">
-              <label class="form-checkbox-label">
-                <input type="checkbox" id="db-ssl"> Requerir conexión segura SSL (Recomendado para servidores externos)
-              </label>
-            </div>
+      <form id="form-db" class="space-y-4">
+        <input type="hidden" id="db-id"/>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-semibold text-on-surface-variant mb-1">Nombre Descriptivo</label>
+            <input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:border-primary" id="db-name" placeholder="ej: Postgres Producción" required type="text"/>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-on-surface-variant mb-1">Motor</label>
+            <select class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:border-primary" id="db-type">
+              <option value="postgres" selected>PostgreSQL (17 / 16 / 15)</option>
+              <option value="mysql">MySQL / MariaDB</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-on-surface-variant mb-1">Puerto</label>
+            <input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-1.5 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="db-port" placeholder="5432" type="number" value="5432"/>
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-semibold text-on-surface-variant mb-1">Host Endpoint</label>
+            <input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-1.5 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="db-host" placeholder="localhost o IP del VPS" required type="text"/>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-on-surface-variant mb-1">Base de Datos</label>
+            <input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-1.5 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="db-database" placeholder="nombre_bd" required type="text"/>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-on-surface-variant mb-1">Usuario</label>
+            <input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-1.5 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="db-user" placeholder="postgres" required type="text"/>
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-semibold text-on-surface-variant mb-1">Contraseña</label>
+            <input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-1.5 font-mono text-xs text-on-surface focus:outline-none focus:border-primary" id="db-password" placeholder="••••••••" type="password"/>
+          </div>
+          <div class="col-span-2 flex items-center gap-2">
+            <input class="rounded text-primary focus:ring-0 bg-surface-container-lowest border-outline-variant" id="db-ssl" type="checkbox"/>
+            <label class="text-xs text-on-surface-variant" for="db-ssl">Habilitar conexión segura SSL/TLS</label>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" id="btn-test-db-conn">Probar Conexión</button>
-          <button type="submit" class="btn btn-primary">Guardar</button>
+
+        <div class="pt-3 border-t border-outline-variant flex items-center justify-between">
+          <button class="px-3.5 py-1.5 rounded bg-surface-container-high border border-outline-variant text-xs text-on-surface hover:bg-surface-variant" id="btn-test-db-conn" type="button">
+            Probar Conexión
+          </button>
+          <div class="flex gap-2">
+            <button class="px-3 py-1.5 rounded text-xs text-on-surface-variant hover:text-on-surface" id="btn-cancel-db" type="button">Cancelar</button>
+            <button class="px-4 py-1.5 rounded bg-primary-container text-on-primary-fixed font-bold text-xs shadow hover:bg-surface-tint" id="btn-save-db" type="submit">Guardar</button>
+          </div>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal: Visor de Logs de Integridad -->
+  <!-- Logs Modal (Stitch Terminal Shell) -->
   <div class="modal-overlay" id="modal-logs">
-    <div class="modal" style="max-width: 800px;">
-      <div class="modal-header">
-        <h3 class="card-title">Registro de Auditoría de Restauración</h3>
-        <button class="close-btn" id="btn-close-logs-modal">&times;</button>
+    <div class="relative bg-surface-container-lowest border border-outline-variant rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden">
+      <div class="px-4 py-2.5 bg-surface-container-high border-b border-outline-variant flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+          <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+          <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+          <span class="ml-2 font-mono text-[11px] text-outline">streamvault-audit-output.log</span>
+        </div>
+        <button class="text-outline hover:text-on-surface" id="btn-close-logs-modal">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
       </div>
-      <div class="modal-body">
-        <div class="terminal-box" id="logs-content">Cargando registros...</div>
+      <div class="p-4 font-mono text-xs text-on-surface-variant whitespace-pre-wrap max-h-96 overflow-y-auto" id="logs-content">
+        No hay registros disponibles.
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" id="btn-close-logs">Cerrar</button>
+      <div class="p-3 bg-surface-container-low border-t border-outline-variant flex justify-end">
+        <button class="px-3 py-1.5 rounded bg-surface-container-high border border-outline-variant text-xs font-semibold" id="btn-close-logs">
+          Cerrar
+        </button>
       </div>
     </div>
   </div>
-
-  <!-- Toast Container -->
-  <div class="toast-container" id="toast-container"></div>
 
   <script src="/js/app.js"></script>
 </body>

@@ -1,7 +1,8 @@
-// StreamVault DB Dashboard Client
+// StreamVault DB Dashboard Client (Stitch Obsidian Stream Edition)
 document.addEventListener('DOMContentLoaded', () => {
-  // Elements
-  const tabs = document.querySelectorAll('.tab-btn');
+  // Navigation & Tabs
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const navLinks = document.querySelectorAll('.nav-tab-link');
   const tabContents = document.querySelectorAll('.tab-content');
   const btnRefresh = document.getElementById('btn-refresh');
   const toastContainer = document.getElementById('toast-container');
@@ -21,11 +22,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const tableTestsBody = document.getElementById('table-tests-body');
   const selectDbManual = document.getElementById('select-db-manual');
   const btnTriggerBackup = document.getElementById('btn-trigger-backup');
+  const btnQuickBackup = document.getElementById('btn-quick-backup');
+  const tableSearchInput = document.getElementById('table-search-input');
+  const liveAuditLogs = document.getElementById('live-audit-logs');
+  const btnCopyLiveLogs = document.getElementById('btn-copy-live-logs');
 
   // Modals
   const modalDb = document.getElementById('modal-db');
   const btnOpenAddDb = document.getElementById('btn-open-add-db');
+  const btnOpenAddDb2 = document.getElementById('btn-open-add-db-2');
   const btnCloseDbModal = document.getElementById('btn-close-db-modal');
+  const btnCancelDb = document.getElementById('btn-cancel-db');
   const formDb = document.getElementById('form-db');
   const btnTestDbConn = document.getElementById('btn-test-db-conn');
   const dbTypeSelect = document.getElementById('db-type');
@@ -61,8 +68,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnToggleKeyVisibility = document.getElementById('btn-toggle-key-visibility');
   const iconEyeShow = document.getElementById('icon-eye-show');
   const iconEyeHide = document.getElementById('icon-eye-hide');
+  const btnPasteKey = document.getElementById('btn-paste-key');
   const btnLockSession = document.getElementById('btn-lock-session');
   const btnUnlock = document.getElementById('btn-unlock');
+
+  let currentBackupsList = [];
 
   // Token management
   function getToken() {
@@ -92,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const res = await fetch(url, { ...options, headers });
     if (res.status === 401) {
-      // Show Lock Screen
       showLockScreen();
       throw new Error('Autenticación requerida.');
     }
@@ -115,14 +124,29 @@ document.addEventListener('DOMContentLoaded', () => {
   btnToggleKeyVisibility.addEventListener('click', () => {
     if (inputAccessKey.type === 'password') {
       inputAccessKey.type = 'text';
-      iconEyeShow.style.display = 'none';
-      iconEyeHide.style.display = 'block';
+      iconEyeShow.classList.add('hidden');
+      iconEyeHide.classList.remove('hidden');
     } else {
       inputAccessKey.type = 'password';
-      iconEyeShow.style.display = 'block';
-      iconEyeHide.style.display = 'none';
+      iconEyeShow.classList.remove('hidden');
+      iconEyeHide.classList.add('hidden');
     }
   });
+
+  // Paste key from clipboard
+  if (btnPasteKey) {
+    btnPasteKey.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          inputAccessKey.value = text.trim();
+          showToast('Llave pegada del portapapeles', 'info');
+        }
+      } catch (e) {
+        inputAccessKey.focus();
+      }
+    });
+  }
 
   // Lock Screen submit
   formLockScreen.addEventListener('submit', async (e) => {
@@ -132,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       btnUnlock.disabled = true;
-      btnUnlock.textContent = 'Verificando...';
+      btnUnlock.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span><span>Verificando...</span>';
       lockErrorAlert.style.display = 'none';
 
       const res = await fetch('/api/auth/login', {
@@ -158,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lockErrorAlert.style.display = 'flex';
     } finally {
       btnUnlock.disabled = false;
-      btnUnlock.textContent = 'Desbloquear Panel';
+      btnUnlock.innerHTML = '<span class="material-symbols-outlined text-[18px]">key</span><span>Desbloquear Panel</span>';
     }
   });
 
@@ -215,28 +239,53 @@ document.addEventListener('DOMContentLoaded', () => {
   function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.textContent = message;
+    const iconName = type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info';
+    toast.innerHTML = `<span class="material-symbols-outlined text-[18px]">${iconName}</span><span>${message}</span>`;
     toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transition = 'opacity 0.3s';
+      toast.style.transform = 'translateX(20px)';
+      toast.style.transition = 'all 0.3s ease';
       setTimeout(() => toast.remove(), 300);
     }, 4500);
   }
 
-  // Tab Switching
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('active'));
-      tabContents.forEach(c => c.classList.remove('active'));
-
-      tab.classList.add('active');
-      const target = document.getElementById(tab.dataset.tab);
-      if (target) target.classList.add('active');
+  // Unified Tab Switching for Sidebar & Top Nav
+  function switchTab(tabId) {
+    // Update sidebar buttons
+    tabButtons.forEach(b => {
+      if (b.dataset.tab === tabId) {
+        b.className = 'w-full tab-btn active flex items-center gap-3 bg-surface-container text-primary font-semibold rounded-lg px-3 py-2 border-l-2 border-primary text-xs text-left';
+      } else {
+        b.className = 'w-full tab-btn flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg px-3 py-2 text-xs text-left transition-colors';
+      }
     });
+
+    // Update top nav links
+    navLinks.forEach(l => {
+      if (l.dataset.tab === tabId) {
+        l.className = 'nav-tab-link active text-primary border-b-2 border-primary font-semibold pb-1 text-xs transition-colors duration-150';
+      } else {
+        l.className = 'nav-tab-link text-on-surface-variant hover:text-on-surface pb-1 text-xs transition-colors duration-150';
+      }
+    });
+
+    // Show target section
+    tabContents.forEach(c => {
+      if (c.id === tabId) c.classList.add('active');
+      else c.classList.remove('active');
+    });
+  }
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // DB Type port switch
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => switchTab(link.dataset.tab));
+  });
+
+  // DB Type port switcher
   dbTypeSelect.addEventListener('change', () => {
     if (dbTypeSelect.value === 'mysql') {
       if (dbPortInput.value === '5432') dbPortInput.value = '3306';
@@ -248,11 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Google Drive Auth switcher
   gdriveAuthType.addEventListener('change', () => {
     if (gdriveAuthType.value === 'service_account') {
-      sectionSaJson.style.display = 'block';
-      sectionOauth.style.display = 'none';
+      sectionSaJson.classList.remove('hidden');
+      sectionOauth.classList.add('hidden');
     } else {
-      sectionSaJson.style.display = 'none';
-      sectionOauth.style.display = 'block';
+      sectionSaJson.classList.add('hidden');
+      sectionOauth.classList.remove('hidden');
     }
   });
 
@@ -291,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         btnOauthConnect.disabled = true;
-        btnOauthConnect.textContent = 'Iniciando autorización...';
+        btnOauthConnect.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span><span>Iniciando...</span>';
 
         const res = await authFetch('/api/gdrive/oauth/url', {
           method: 'POST',
@@ -312,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'google_oauth_popup',
             `width=${width},height=${height},top=${top},left=${left},status=no,resizable=yes`
           );
-          showToast('Ventana de Google abierta. Selecciona tu cuenta y concede permisos.', 'info');
+          showToast('Ventana de Google abierta. Selecciona tu cuenta y autoriza permisos.', 'info');
         } else {
           showToast('Error al preparar OAuth: ' + (json.error || 'Desconocido'), 'error');
         }
@@ -320,15 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Error de conexión: ' + err.message, 'error');
       } finally {
         btnOauthConnect.disabled = false;
-        btnOauthConnect.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-          </svg>
-          Conectar con Google (1 Clic)
-        `;
+        btnOauthConnect.innerHTML = '<span class="material-symbols-outlined text-[16px]">link</span><span>Conectar con Google (1 Clic)</span>';
       }
     });
   }
@@ -337,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('message', async (event) => {
     if (event.data && event.data.type === 'GDRIVE_OAUTH_SUCCESS') {
       if (oauthTokenStatus) {
-        oauthTokenStatus.className = 'badge badge-success';
+        oauthTokenStatus.className = 'h-6 px-2.5 rounded-full font-mono text-[10px] bg-secondary/10 border border-secondary/30 text-secondary shrink-0 inline-flex items-center';
         oauthTokenStatus.textContent = 'Token Vinculado';
       }
       gdriveRefreshToken.placeholder = '•••••••••••••••• (Token Activo)';
@@ -347,6 +388,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Copy live audit logs
+  if (btnCopyLiveLogs) {
+    btnCopyLiveLogs.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(liveAuditLogs.innerText);
+        showToast('Registros copiados al portapapeles', 'success');
+      } catch (e) {}
+    });
+  }
+
+  // Search filter for backups table
+  if (tableSearchInput) {
+    tableSearchInput.addEventListener('input', () => {
+      const q = tableSearchInput.value.toLowerCase().trim();
+      renderBackupsTable(currentBackupsList.filter(b => 
+        (b.database_name && b.database_name.toLowerCase().includes(q)) ||
+        (b.filename && b.filename.toLowerCase().includes(q)) ||
+        (b.status && b.status.toLowerCase().includes(q))
+      ));
+    });
+  }
+
   // API Calls
   async function fetchStatus() {
     try {
@@ -355,18 +418,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!data.success) return;
 
       statTotalBackups.textContent = data.stats.totalBackups;
-      statSuccessRate.textContent = `Tasa de éxito: ${data.stats.successRate}% (${data.stats.successfulBackups} exitosos)`;
+      statSuccessRate.textContent = `${data.stats.successRate}% éxito (${data.stats.successfulBackups} ok)`;
       statTotalBytes.textContent = formatBytes(data.stats.totalBytesUploaded);
       statCronSchedule.textContent = data.scheduler.activeSchedule;
       statTestPassRate.textContent = `${data.stats.testPassRate}%`;
-      statTestCount.textContent = `${data.stats.totalRestoreTests} pruebas (${data.stats.passedRestoreTests} aprobadas)`;
+      statTestCount.textContent = `${data.stats.totalRestoreTests} pruebas`;
 
       if (data.hasDriveConfig) {
-        badgeDriveStatus.className = 'badge badge-success';
-        badgeDriveStatus.innerHTML = '<span class="pulse-dot"></span> Google Drive Conectado';
+        badgeDriveStatus.className = 'hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/10 border border-secondary/30 font-mono text-xs text-secondary';
+        badgeDriveStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-secondary animate-pulse-dot"></span><span>Google Drive Activo</span>';
       } else {
-        badgeDriveStatus.className = 'badge badge-warning';
-        badgeDriveStatus.innerHTML = '<span class="pulse-dot"></span> Configurar Google Drive';
+        badgeDriveStatus.className = 'hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 font-mono text-xs text-yellow-400';
+        badgeDriveStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse-dot"></span><span>Configurar Drive</span>';
       }
     } catch (err) {
       console.error('Error fetching status:', err);
@@ -381,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const dbs = json.data;
       // Populate select dropdown
-      selectDbManual.innerHTML = '<option value="">Seleccionar BD...</option>';
+      selectDbManual.innerHTML = '<option value="">Seleccionar Base de Datos...</option>';
       dbs.forEach(db => {
         const opt = document.createElement('option');
         opt.value = db.id;
@@ -393,8 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dbs.length === 0) {
         tableDbsBody.innerHTML = `
           <tr>
-            <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-              No hay bases de datos configuradas todavía. Haz clic en "Agregar Base de Datos".
+            <td colspan="9" class="text-center text-outline py-8">
+              No hay bases de datos configuradas todavía. Haz clic en "Nueva Conexión".
             </td>
           </tr>
         `;
@@ -402,29 +465,32 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       tableDbsBody.innerHTML = dbs.map(db => `
-        <tr>
-          <td><strong>${db.name}</strong></td>
-          <td><span class="badge ${db.type === 'postgres' ? 'badge-stream' : 'badge-warning'}">${db.type.toUpperCase()}</span></td>
-          <td class="mono-cell">${db.host}:${db.port}</td>
-          <td><code>${db.database_name}</code></td>
-          <td>${db.username}</td>
-          <td>${db.ssl ? '✅ Sí' : '❌ No'}</td>
-          <td>${formatDate(db.last_tested_at)}</td>
-          <td>
-            ${db.test_status === 'SUCCESS' ? '<span class="badge badge-success">Conectado</span>' :
-              db.test_status === 'FAILED' ? `<span class="badge badge-danger" title="${db.test_error || ''}">Error</span>` :
-              '<span class="badge badge-warning">Sin probar</span>'}
+        <tr class="hover:bg-surface-container/50 transition-colors">
+          <td class="py-3.5 px-4 font-semibold text-on-surface">${db.name}</td>
+          <td class="py-3.5 px-4">
+            <span class="w-6 h-6 rounded ${db.type === 'postgres' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'} flex items-center justify-center font-bold text-[10px]">
+              ${db.type === 'postgres' ? 'PG' : 'MY'}
+            </span>
           </td>
-          <td>
-            <div style="display: flex; gap: 0.4rem;">
-              <button class="btn btn-secondary btn-sm btn-edit-db" data-id="${db.id}">Editar</button>
-              <button class="btn btn-danger btn-sm btn-delete-db" data-id="${db.id}">Eliminar</button>
+          <td class="py-3.5 px-4 font-mono text-xs text-on-surface-variant">${db.host}:${db.port}</td>
+          <td class="py-3.5 px-4 font-mono text-xs text-primary">${db.database_name}</td>
+          <td class="py-3.5 px-4 font-mono text-xs text-on-surface-variant">${db.username}</td>
+          <td class="py-3.5 px-4 font-mono text-xs">${db.ssl ? 'TLS Activo' : 'Inseguro'}</td>
+          <td class="py-3.5 px-4 font-mono text-[11px] text-on-surface-variant">${formatDate(db.last_tested_at)}</td>
+          <td class="py-3.5 px-4">
+            ${db.test_status === 'SUCCESS' ? '<span class="h-5 px-2 rounded-full font-mono text-[10px] bg-secondary/10 border border-secondary/30 text-secondary inline-flex items-center gap-1">OK</span>' :
+              db.test_status === 'FAILED' ? `<span class="h-5 px-2 rounded-full font-mono text-[10px] bg-error-container/20 border border-error/30 text-error inline-flex items-center gap-1" title="${db.test_error || ''}">Error</span>` :
+              '<span class="h-5 px-2 rounded-full font-mono text-[10px] bg-surface-container text-outline">Sin probar</span>'}
+          </td>
+          <td class="py-3.5 px-4 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              <button class="px-2 py-1 rounded bg-surface-container border border-outline-variant hover:bg-surface-variant text-on-surface font-mono text-[11px] btn-edit-db" data-id="${db.id}">Editar</button>
+              <button class="px-2 py-1 rounded bg-error-container/20 border border-error/30 hover:bg-error-container/40 text-error font-mono text-[11px] btn-delete-db" data-id="${db.id}">Eliminar</button>
             </div>
           </td>
         </tr>
       `).join('');
 
-      // Add listeners to actions
       document.querySelectorAll('.btn-edit-db').forEach(btn => {
         btn.addEventListener('click', () => editDb(btn.dataset.id));
       });
@@ -436,57 +502,87 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function renderBackupsTable(backups) {
+    if (!backups || backups.length === 0) {
+      tableBackupsBody.innerHTML = `
+        <tr>
+          <td colspan="8" class="text-center text-outline py-8">
+            Aún no se han generado copias de seguridad. Usa "Iniciar Transmisión" para respaldar.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBackupsBody.innerHTML = backups.map(b => `
+      <tr class="hover:bg-surface-container/50 transition-colors">
+        <td class="py-3.5 px-4">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded ${b.db_type === 'postgres' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'} flex items-center justify-center font-bold text-[10px]">
+              ${b.db_type === 'postgres' ? 'PG' : 'MY'}
+            </span>
+            <span class="font-medium text-on-surface font-mono text-xs">${b.database_name}</span>
+          </div>
+        </td>
+        <td class="py-3.5 px-4 font-mono text-xs text-on-surface-variant truncate max-w-[200px]" title="${b.filename}">
+          ${b.filename}
+        </td>
+        <td class="py-3.5 px-4 font-mono text-xs font-semibold text-primary">
+          ${formatBytes(b.size_bytes)}
+        </td>
+        <td class="py-3.5 px-4 font-mono text-xs text-on-surface-variant">
+          ${b.duration_ms ? (b.duration_ms / 1000).toFixed(1) + 's' : '-'}
+        </td>
+        <td class="py-3.5 px-4">
+          ${b.status === 'SUCCESS' ? `
+            <span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-secondary/10 border border-secondary/30 text-secondary inline-flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px]">check</span>
+              Subido a Drive
+            </span>` :
+            b.status === 'STREAMING' ? `
+            <span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-primary-container/10 border border-primary-container/30 text-primary-container inline-flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse-dot"></span>
+              Transmitiendo...
+            </span>` :
+            `<span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-error-container/20 border border-error/30 text-error inline-flex items-center gap-1 cursor-help" title="${b.error_message || ''}">
+              <span class="material-symbols-outlined text-[14px]">error</span>
+              Falló
+            </span>`}
+        </td>
+        <td class="py-3.5 px-4 font-mono text-[11px] text-outline truncate max-w-[140px]" title="${b.checksum_sha256 || ''}">
+          ${b.checksum_sha256 ? b.checksum_sha256.substring(0, 12) + '...' : '-'}
+        </td>
+        <td class="py-3.5 px-4 font-mono text-[11px] text-on-surface-variant">
+          ${formatDate(b.created_at)}
+        </td>
+        <td class="py-3.5 px-4 text-right">
+          <div class="flex items-center justify-end gap-1.5">
+            ${b.gdrive_file_id ? `
+              <a href="${b.gdrive_url || `https://drive.google.com/file/d/${b.gdrive_file_id}/view`}" target="_blank" class="px-2 py-1 rounded bg-surface-container border border-outline-variant hover:bg-surface-variant text-primary font-mono text-[11px] flex items-center gap-1" title="Abrir en Google Drive">
+                Drive <span class="material-symbols-outlined text-[13px]">open_in_new</span>
+              </a>
+              <button class="px-2 py-1 rounded bg-surface-container border border-outline-variant hover:bg-surface-variant text-on-surface font-mono text-[11px] btn-verify-backup flex items-center gap-1" data-id="${b.id}" title="Verificar Integridad">
+                <span class="material-symbols-outlined text-[13px]">verified</span> Auditar
+              </button>
+            ` : '-'}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    document.querySelectorAll('.btn-verify-backup').forEach(btn => {
+      btn.addEventListener('click', () => triggerIntegrityTest(btn.dataset.id));
+    });
+  }
+
   async function fetchBackups() {
     try {
       const res = await authFetch('/api/backups?limit=50');
       const json = await res.json();
       if (!json.success) return;
 
-      const backups = json.data;
-      if (backups.length === 0) {
-        tableBackupsBody.innerHTML = `
-          <tr>
-            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-              Aún no se han generado copias de seguridad. Usa "Ejecutar Copia Ahora" para iniciar la primera transmisión.
-            </td>
-          </tr>
-        `;
-        return;
-      }
-
-      tableBackupsBody.innerHTML = backups.map(b => `
-        <tr>
-          <td><strong>${b.database_name}</strong> <span class="badge ${b.db_type === 'postgres' ? 'badge-stream' : 'badge-warning'} btn-sm">${b.db_type.toUpperCase()}</span></td>
-          <td class="mono-cell">${b.filename}</td>
-          <td><strong>${formatBytes(b.size_bytes)}</strong></td>
-          <td>${b.duration_ms ? (b.duration_ms / 1000).toFixed(1) + 's' : '-'}</td>
-          <td>
-            ${b.status === 'SUCCESS' ? '<span class="badge badge-success">Subido a Drive</span>' :
-              b.status === 'STREAMING' ? '<span class="badge badge-stream"><span class="pulse-dot"></span> Transmitiendo...</span>' :
-              `<span class="badge badge-danger" title="${b.error_message || ''}">Falló</span>`}
-          </td>
-          <td class="mono-cell" title="${b.checksum_sha256 || ''}">
-            ${b.checksum_sha256 ? b.checksum_sha256.substring(0, 10) + '...' : '-'}
-          </td>
-          <td>${formatDate(b.created_at)}</td>
-          <td>
-            <div style="display: flex; gap: 0.4rem;">
-              ${b.gdrive_file_id ? `
-                <a href="${b.gdrive_url || `https://drive.google.com/file/d/${b.gdrive_file_id}/view`}" target="_blank" class="btn btn-secondary btn-sm" title="Abrir en Google Drive">
-                  Drive ↗
-                </a>
-                <button class="btn btn-primary btn-sm btn-verify-backup" data-id="${b.id}" title="Verificar Integridad & Restauración">
-                  Auditar
-                </button>
-              ` : '-'}
-            </div>
-          </td>
-        </tr>
-      `).join('');
-
-      document.querySelectorAll('.btn-verify-backup').forEach(btn => {
-        btn.addEventListener('click', () => triggerIntegrityTest(btn.dataset.id));
-      });
+      currentBackupsList = json.data || [];
+      renderBackupsTable(currentBackupsList);
     } catch (err) {
       console.error('Error fetching backups:', err);
     }
@@ -502,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tests.length === 0) {
         tableTestsBody.innerHTML = `
           <tr>
-            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+            <td colspan="8" class="text-center text-outline py-8">
               No se han ejecutado pruebas de integridad aún.
             </td>
           </tr>
@@ -510,21 +606,31 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      // Update live audit logs with most recent test
+      if (tests[0] && liveAuditLogs) {
+        const latest = tests[0];
+        liveAuditLogs.innerHTML = `
+          <p><span class="text-outline">${formatDate(latest.created_at)}</span> [INSPECT] Evaluando respaldo #${latest.backup_history_id} (${latest.filename})</p>
+          <p><span class="text-outline">[STATUS]</span> ${latest.status} | Modo: ${latest.test_type} | Tablas: ${latest.tables_verified || 0}</p>
+          <p class="${latest.status === 'PASSED' ? 'text-secondary font-semibold' : 'text-error font-semibold'}">[RESULT] ${latest.status === 'PASSED' ? '100% Íntegro y Restaurable' : (latest.error_message || 'Falló verificación')}</p>
+        `;
+      }
+
       tableTestsBody.innerHTML = tests.map(t => `
-        <tr>
-          <td>#${t.id}</td>
-          <td class="mono-cell">${t.filename || `Backup #${t.backup_history_id}`}</td>
-          <td><span class="badge badge-stream">${t.test_type}</span></td>
-          <td>
-            ${t.status === 'PASSED' ? '<span class="badge badge-success">100% Íntegro</span>' :
-              t.status === 'RUNNING' ? '<span class="badge badge-stream"><span class="pulse-dot"></span> Ejecutando...</span>' :
-              `<span class="badge badge-danger" title="${t.error_message || ''}">Falló</span>`}
+        <tr class="hover:bg-surface-container/50 transition-colors">
+          <td class="py-3.5 px-4 font-mono text-xs text-primary">#${t.id}</td>
+          <td class="py-3.5 px-4 font-mono text-xs text-on-surface truncate max-w-[220px]">${t.filename || `Backup #${t.backup_history_id}`}</td>
+          <td class="py-3.5 px-4 font-mono text-[11px] text-on-surface-variant">${t.test_type}</td>
+          <td class="py-3.5 px-4">
+            ${t.status === 'PASSED' ? '<span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-secondary/10 border border-secondary/30 text-secondary inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">check</span> 100% Íntegro</span>' :
+              t.status === 'RUNNING' ? '<span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-primary-container/10 border border-primary-container/30 text-primary-container inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse-dot"></span> Ejecutando</span>' :
+              `<span class="h-6 px-2.5 rounded-full font-mono text-[11px] bg-error-container/20 border border-error/30 text-error inline-flex items-center gap-1" title="${t.error_message || ''}"><span class="material-symbols-outlined text-[14px]">error</span> Falló</span>`}
           </td>
-          <td><strong>${t.tables_verified || 0}</strong> tablas</td>
-          <td>${t.duration_ms ? (t.duration_ms / 1000).toFixed(1) + 's' : '-'}</td>
-          <td>${formatDate(t.created_at)}</td>
-          <td>
-            <button class="btn btn-secondary btn-sm btn-view-logs" data-id="${t.id}" data-logs="${encodeURIComponent(t.logs || t.error_message || '')}">
+          <td class="py-3.5 px-4 font-mono text-xs font-semibold text-secondary">${t.tables_verified || 0} tablas</td>
+          <td class="py-3.5 px-4 font-mono text-xs text-on-surface-variant">${t.duration_ms ? (t.duration_ms / 1000).toFixed(1) + 's' : '-'}</td>
+          <td class="py-3.5 px-4 font-mono text-[11px] text-on-surface-variant">${formatDate(t.created_at)}</td>
+          <td class="py-3.5 px-4 text-right">
+            <button class="px-2.5 py-1 rounded bg-surface-container border border-outline-variant hover:bg-surface-variant text-on-surface font-mono text-[11px] btn-view-logs" data-id="${t.id}" data-logs="${encodeURIComponent(t.logs || t.error_message || '')}">
               Ver Registros
             </button>
           </td>
@@ -555,23 +661,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (d.has_client_secret) gdriveClientSecret.placeholder = '•••••••••••••••• (Configurado)';
         if (d.has_oauth) {
           if (oauthTokenStatus) {
-            oauthTokenStatus.className = 'badge badge-success';
+            oauthTokenStatus.className = 'h-6 px-2.5 rounded-full font-mono text-[10px] bg-secondary/10 border border-secondary/30 text-secondary shrink-0 inline-flex items-center';
             oauthTokenStatus.textContent = 'Token Vinculado';
           }
           gdriveRefreshToken.placeholder = '•••••••••••••••• (Token Activo)';
         } else {
           if (oauthTokenStatus) {
-            oauthTokenStatus.className = 'badge badge-secondary';
+            oauthTokenStatus.className = 'h-6 px-2.5 rounded-full font-mono text-[10px] bg-surface-container-high border border-outline-variant text-outline shrink-0 inline-flex items-center';
             oauthTokenStatus.textContent = 'Sin Token';
           }
         }
 
         if (d.auth_type === 'service_account') {
-          sectionSaJson.style.display = 'block';
-          sectionOauth.style.display = 'none';
+          sectionSaJson.classList.remove('hidden');
+          sectionOauth.classList.add('hidden');
         } else {
-          sectionSaJson.style.display = 'none';
-          sectionOauth.style.display = 'block';
+          sectionSaJson.classList.add('hidden');
+          sectionOauth.classList.remove('hidden');
         }
       }
     } catch (err) {
@@ -601,7 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       btnTriggerBackup.disabled = true;
-      btnTriggerBackup.innerHTML = '<span class="pulse-dot"></span> Iniciando streaming...';
+      btnTriggerBackup.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span><span>Iniciando streaming...</span>';
       showToast('Iniciando transmisión directa a Google Drive...', 'info');
 
       const res = await authFetch(`/api/backups/trigger/${dbId}`, { method: 'POST' });
@@ -617,15 +723,21 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Error al iniciar copia: ' + err.message, 'error');
     } finally {
       btnTriggerBackup.disabled = false;
-      btnTriggerBackup.innerHTML = `
-        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        Ejecutar Copia Ahora
-      `;
+      btnTriggerBackup.innerHTML = '<span class="material-symbols-outlined text-[16px]">bolt</span><span>Iniciar Transmisión</span>';
     }
   });
+
+  if (btnQuickBackup) {
+    btnQuickBackup.addEventListener('click', () => {
+      switchTab('tab-backups');
+      if (selectDbManual.value) {
+        btnTriggerBackup.click();
+      } else {
+        selectDbManual.focus();
+        showToast('Selecciona la base de datos a respaldar en el panel.', 'info');
+      }
+    });
+  }
 
   // Trigger Integrity Test
   async function triggerIntegrityTest(backupId) {
@@ -634,9 +746,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await authFetch(`/api/restore-tests/trigger/${backupId}`, { method: 'POST' });
       const json = await res.json();
       if (json.success) {
-        showToast('Auditoría iniciada. Revisa la pestaña Pruebas de Restauración.', 'success');
-        // Switch to tab
-        document.querySelector('[data-tab="tab-integrity"]').click();
+        showToast('Auditoría iniciada con éxito.', 'success');
+        switchTab('tab-integrity');
         await fetchRestoreTests();
         await fetchStatus();
       } else {
@@ -655,7 +766,12 @@ document.addEventListener('DOMContentLoaded', () => {
     modalDb.classList.add('open');
   });
 
+  if (btnOpenAddDb2) {
+    btnOpenAddDb2.addEventListener('click', () => btnOpenAddDb.click());
+  }
+
   btnCloseDbModal.addEventListener('click', () => modalDb.classList.remove('open'));
+  btnCancelDb.addEventListener('click', () => modalDb.classList.remove('open'));
 
   async function editDb(id) {
     try {
@@ -677,27 +793,28 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('modal-db-title').textContent = 'Editar Base de Datos: ' + db.name;
       modalDb.classList.add('open');
     } catch (err) {
-      showToast('Error al cargar datos: ' + err.message, 'error');
+      showToast('Error al cargar base de datos: ' + err.message, 'error');
     }
   }
 
   async function deleteDb(id) {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta configuración de base de datos?')) return;
+    if (!confirm('¿Seguro que deseas eliminar esta configuración de base de datos?')) return;
     try {
       const res = await authFetch(`/api/db-configs/${id}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         showToast('Base de datos eliminada.', 'success');
         await fetchDatabases();
+        await fetchStatus();
       } else {
-        showToast('Error: ' + json.error, 'error');
+        showToast('Error al eliminar: ' + json.error, 'error');
       }
     } catch (err) {
-      showToast('Error al eliminar: ' + err.message, 'error');
+      showToast('Error: ' + err.message, 'error');
     }
   }
 
-  // Save DB Form
+  // Save DB
   formDb.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('db-id').value;
@@ -814,7 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       btnTestGdrive.disabled = true;
-      btnTestGdrive.textContent = 'Verificando Google Drive...';
+      btnTestGdrive.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span><span>Verificando Drive...</span>';
       const res = await authFetch('/api/gdrive-config/test', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -830,7 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Error al verificar: ' + err.message, 'error');
     } finally {
       btnTestGdrive.disabled = false;
-      btnTestGdrive.textContent = 'Probar Conexión con Drive';
+      btnTestGdrive.innerHTML = '<span class="material-symbols-outlined text-[16px]">cloud_sync</span><span>Probar Conexión con Drive</span>';
     }
   });
 
